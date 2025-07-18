@@ -1,257 +1,405 @@
-# Menshun Enterprise PAM Tool - Development Makefile
-# This Makefile provides convenient commands for development, testing, and deployment
+# Menshun PAM - Simplified Deployment Makefile
+# This Makefile provides easy commands to deploy and manage Menshun PAM
 
-.PHONY: help install dev test lint format security clean docker docs
+# Variables
+COMPOSE_FILE := docker-compose.yml
+PROD_COMPOSE_FILE := docker-compose.prod.yml
+PROJECT_NAME := menshun-pam
+BACKUP_DIR := ./backups
+LOG_DIR := ./logs
+
+# Colors for terminal output
+RED := \033[0;31m
+GREEN := \033[0;32m
+YELLOW := \033[1;33m
+BLUE := \033[0;34m
+NC := \033[0m # No Color
 
 # Default target
-help:
-	@echo "Menshun Development Commands"
-	@echo "============================"
+.DEFAULT_GOAL := help
+
+##@ General Commands
+
+.PHONY: help
+help: ## Display this help message
+	@echo "$(BLUE)Menshun PAM - Enterprise Privileged Access Management$(NC)"
+	@echo "$(BLUE)============================================$(NC)"
 	@echo ""
-	@echo "Setup & Installation:"
-	@echo "  install       - Install all dependencies and setup development environment"
-	@echo "  install-hooks - Install pre-commit hooks"
-	@echo ""
-	@echo "Development:"
-	@echo "  dev           - Start development environment with hot-reload"
-	@echo "  dev-backend   - Start only backend development server"
-	@echo "  dev-frontend  - Start only frontend development server"
-	@echo ""
-	@echo "Code Quality:"
-	@echo "  lint          - Run all linting checks"
-	@echo "  format        - Format all code"
-	@echo "  type-check    - Run type checking"
-	@echo "  security      - Run security scans"
-	@echo ""
-	@echo "Testing:"
-	@echo "  test          - Run all tests"
-	@echo "  test-backend  - Run backend tests with coverage"
-	@echo "  test-frontend - Run frontend tests with coverage"
-	@echo "  coverage      - Generate and view coverage reports"
-	@echo ""
-	@echo "Database:"
-	@echo "  db-migrate    - Run database migrations"
-	@echo "  db-seed       - Seed database with directory roles"
-	@echo "  db-reset      - Reset database (WARNING: destroys data)"
-	@echo ""
-	@echo "Docker:"
-	@echo "  docker-build  - Build all Docker images"
-	@echo "  docker-up     - Start all services with Docker Compose"
-	@echo "  docker-down   - Stop all Docker services"
-	@echo "  docker-logs   - View Docker logs"
-	@echo ""
-	@echo "Documentation:"
-	@echo "  docs          - Generate and serve documentation"
-	@echo "  docs-api      - Generate API documentation"
-	@echo ""
-	@echo "Cleanup:"
-	@echo "  clean         - Clean temporary files and caches"
-	@echo "  clean-docker  - Clean Docker images and volumes"
+	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
-# Installation and Setup
-install: install-backend install-frontend install-hooks
-	@echo "✅ Installation complete! Run 'make dev' to start development."
+.PHONY: init
+init: ## 🚀 Initialize and deploy Menshun PAM (development)
+	@echo "$(BLUE)🚀 Initializing Menshun PAM Development Environment$(NC)"
+	@$(MAKE) check-requirements
+	@$(MAKE) setup-directories
+	@$(MAKE) setup-env-dev
+	@$(MAKE) build
+	@$(MAKE) start-dev
+	@$(MAKE) init-database
+	@$(MAKE) post-deploy-info
+	@echo "$(GREEN)✅ Menshun PAM development environment is ready!$(NC)"
 
-install-backend:
-	@echo "📦 Installing backend dependencies..."
-	cd backend && pip install -r requirements.txt -r requirements-dev.txt
+.PHONY: init-prod
+init-prod: ## 🏢 Initialize and deploy Menshun PAM (production)
+	@echo "$(BLUE)🏢 Initializing Menshun PAM Production Environment$(NC)"
+	@$(MAKE) check-requirements
+	@$(MAKE) setup-directories
+	@$(MAKE) setup-env-prod
+	@$(MAKE) build-prod
+	@$(MAKE) start-prod
+	@$(MAKE) init-database-prod
+	@$(MAKE) setup-ssl
+	@$(MAKE) post-deploy-info-prod
+	@echo "$(GREEN)✅ Menshun PAM production environment is ready!$(NC)"
 
-install-frontend:
-	@echo "📦 Installing frontend dependencies..."
-	cd frontend && npm ci
+##@ Setup Commands
 
-install-hooks:
-	@echo "🔧 Installing pre-commit hooks..."
-	pip install pre-commit
-	pre-commit install
-	pre-commit install --hook-type commit-msg
+.PHONY: check-requirements
+check-requirements: ## Check system requirements
+	@echo "$(YELLOW)📋 Checking system requirements...$(NC)"
+	@command -v docker >/dev/null 2>&1 || { echo "$(RED)❌ Docker is not installed$(NC)"; exit 1; }
+	@command -v docker-compose >/dev/null 2>&1 || { echo "$(RED)❌ Docker Compose is not installed$(NC)"; exit 1; }
+	@command -v git >/dev/null 2>&1 || { echo "$(RED)❌ Git is not installed$(NC)"; exit 1; }
+	@echo "$(GREEN)✅ All requirements satisfied$(NC)"
 
-# Development
-dev: docker-up
-	@echo "🚀 Starting full development environment..."
-	@echo "Backend API: http://localhost:8000"
-	@echo "Frontend App: http://localhost:3000"
-	@echo "API Docs: http://localhost:8000/docs"
+.PHONY: setup-directories
+setup-directories: ## Create required directories
+	@echo "$(YELLOW)📁 Creating required directories...$(NC)"
+	@mkdir -p $(BACKUP_DIR)
+	@mkdir -p $(LOG_DIR)
+	@mkdir -p data/postgres
+	@mkdir -p data/redis
+	@mkdir -p ssl/certificates
+	@mkdir -p monitoring/grafana/dashboards
+	@mkdir -p monitoring/grafana/datasources
+	@echo "$(GREEN)✅ Directories created$(NC)"
 
-dev-backend:
-	@echo "🚀 Starting backend development server..."
-	cd backend && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-
-dev-frontend:
-	@echo "🚀 Starting frontend development server..."
-	cd frontend && npm run dev
-
-# Code Quality
-lint: lint-backend lint-frontend
-	@echo "✅ All linting checks passed!"
-
-lint-backend:
-	@echo "🔍 Linting backend code..."
-	cd backend && flake8 app/
-	cd backend && mypy app/
-
-lint-frontend:
-	@echo "🔍 Linting frontend code..."
-	cd frontend && npm run lint
-
-format: format-backend format-frontend
-	@echo "✨ Code formatting complete!"
-
-format-backend:
-	@echo "✨ Formatting backend code..."
-	cd backend && black app/
-	cd backend && isort app/
-
-format-frontend:
-	@echo "✨ Formatting frontend code..."
-	cd frontend && npm run format
-
-type-check: type-check-backend type-check-frontend
-	@echo "✅ Type checking complete!"
-
-type-check-backend:
-	@echo "🔍 Type checking backend..."
-	cd backend && mypy app/
-
-type-check-frontend:
-	@echo "🔍 Type checking frontend..."
-	cd frontend && npm run type-check
-
-security:
-	@echo "🛡️  Running security scans..."
-	cd backend && bandit -r app/ -f json -o bandit-results.json || true
-	cd frontend && npm audit --audit-level moderate || true
-	@echo "🛡️  Security scan complete. Check reports for details."
-
-# Testing
-test: test-backend test-frontend
-	@echo "✅ All tests passed!"
-
-test-backend:
-	@echo "🧪 Running backend tests..."
-	cd backend && pytest --cov=app --cov-report=html --cov-report=term-missing
-
-test-frontend:
-	@echo "🧪 Running frontend tests..."
-	cd frontend && npm run test:coverage
-
-coverage:
-	@echo "📊 Opening coverage reports..."
-	@echo "Backend coverage: backend/htmlcov/index.html"
-	@echo "Frontend coverage: frontend/coverage/lcov-report/index.html"
-	python -m webbrowser backend/htmlcov/index.html
-	python -m webbrowser frontend/coverage/lcov-report/index.html
-
-# Database Management
-db-migrate:
-	@echo "🗄️  Running database migrations..."
-	cd backend && alembic upgrade head
-
-db-seed:
-	@echo "🌱 Seeding database with directory roles..."
-	cd backend && python -m app.scripts.seed_roles
-
-db-reset:
-	@echo "⚠️  WARNING: This will destroy all data!"
-	@read -p "Are you sure? [y/N] " -n 1 -r; \
-	echo; \
-	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
-		docker-compose down -v; \
-		docker-compose up -d postgres; \
-		sleep 5; \
-		make db-migrate db-seed; \
+.PHONY: setup-env-dev
+setup-env-dev: ## Setup development environment file
+	@echo "$(YELLOW)⚙️  Setting up development environment...$(NC)"
+	@if [ ! -f .env ]; then \
+		echo "$(BLUE)📝 Creating development .env file...$(NC)"; \
+		cp .env.example .env; \
+		echo "$(YELLOW)⚠️  Please edit .env file with your Azure AD credentials$(NC)"; \
+		echo "$(YELLOW)   Required: AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_TENANT_ID$(NC)"; \
+	else \
+		echo "$(GREEN)✅ .env file already exists$(NC)"; \
+	fi
+	@if [ ! -f frontend/.env ]; then \
+		echo "$(BLUE)📝 Creating frontend .env file...$(NC)"; \
+		cp frontend/.env.example frontend/.env; \
 	fi
 
-# Docker Management
-docker-build:
-	@echo "🐳 Building Docker images..."
-	docker-compose build
+.PHONY: setup-env-prod
+setup-env-prod: ## Setup production environment file
+	@echo "$(YELLOW)⚙️  Setting up production environment...$(NC)"
+	@if [ ! -f .env ]; then \
+		echo "$(BLUE)📝 Creating production .env file...$(NC)"; \
+		cp .env.example .env; \
+		sed -i.bak 's/ENVIRONMENT=development/ENVIRONMENT=production/' .env; \
+		sed -i.bak 's/DEBUG=true/DEBUG=false/' .env; \
+		sed -i.bak 's/localhost:3000/your-domain.com/' .env; \
+		rm -f .env.bak; \
+		echo "$(RED)🚨 IMPORTANT: Edit .env file with production settings!$(NC)"; \
+		echo "$(YELLOW)   Required: DOMAIN, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_TENANT_ID$(NC)"; \
+		echo "$(YELLOW)   Generate secure passwords for: POSTGRES_PASSWORD, SECRET_KEY, ENCRYPTION_KEY$(NC)"; \
+	else \
+		echo "$(GREEN)✅ .env file already exists$(NC)"; \
+	fi
 
-docker-up:
-	@echo "🐳 Starting Docker services..."
-	docker-compose up -d
-	@echo "⏳ Waiting for services to be ready..."
-	@timeout 60 bash -c 'until docker-compose exec -T backend curl -f http://localhost:8000/health >/dev/null 2>&1; do sleep 2; done' || true
+.PHONY: setup-ssl
+setup-ssl: ## Setup SSL certificates
+	@echo "$(YELLOW)🔐 Setting up SSL certificates...$(NC)"
+	@if [ ! -f ssl/certificates/cert.pem ]; then \
+		echo "$(BLUE)📝 Creating self-signed certificate for development...$(NC)"; \
+		openssl req -x509 -newkey rsa:4096 -keyout ssl/certificates/key.pem -out ssl/certificates/cert.pem -days 365 -nodes -subj "/CN=localhost"; \
+		echo "$(YELLOW)⚠️  For production, replace with proper SSL certificates$(NC)"; \
+	else \
+		echo "$(GREEN)✅ SSL certificates already exist$(NC)"; \
+	fi
 
-docker-down:
-	@echo "🐳 Stopping Docker services..."
-	docker-compose down
+##@ Build Commands
 
-docker-logs:
-	@echo "📋 Viewing Docker logs..."
-	docker-compose logs -f
+.PHONY: build
+build: ## Build all Docker images
+	@echo "$(YELLOW)🔨 Building Docker images...$(NC)"
+	@docker-compose -f $(COMPOSE_FILE) build
 
-# Documentation
-docs:
-	@echo "📚 Generating documentation..."
-	cd docs && mkdocs serve
+.PHONY: build-prod
+build-prod: ## Build production Docker images
+	@echo "$(YELLOW)🔨 Building production Docker images...$(NC)"
+	@docker-compose -f $(PROD_COMPOSE_FILE) build
 
-docs-api:
-	@echo "📚 Generating API documentation..."
-	cd backend && python -m app.scripts.generate_openapi_spec
-	@echo "API documentation available at: http://localhost:8000/docs"
+.PHONY: pull
+pull: ## Pull latest Docker images
+	@echo "$(YELLOW)📥 Pulling latest Docker images...$(NC)"
+	@docker-compose -f $(COMPOSE_FILE) pull
 
-# Cleanup
-clean: clean-python clean-node clean-cache
-	@echo "🧹 Cleanup complete!"
+##@ Service Management
 
-clean-python:
-	@echo "🧹 Cleaning Python cache files..."
-	find . -type f -name "*.pyc" -delete
-	find . -type d -name "__pycache__" -delete
-	find . -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
-	rm -rf backend/.coverage backend/htmlcov backend/.pytest_cache
+.PHONY: start-dev
+start-dev: ## Start development services
+	@echo "$(YELLOW)🚀 Starting development services...$(NC)"
+	@docker-compose -f $(COMPOSE_FILE) up -d
+	@echo "$(GREEN)✅ Development services started$(NC)"
 
-clean-node:
-	@echo "🧹 Cleaning Node.js cache files..."
-	rm -rf frontend/node_modules/.cache
-	rm -rf frontend/build frontend/dist
-	rm -rf frontend/coverage
+.PHONY: start-prod
+start-prod: ## Start production services
+	@echo "$(YELLOW)🚀 Starting production services...$(NC)"
+	@docker-compose -f $(PROD_COMPOSE_FILE) up -d
+	@echo "$(GREEN)✅ Production services started$(NC)"
 
-clean-cache:
-	@echo "🧹 Cleaning cache files..."
-	rm -rf .mypy_cache .pytest_cache
-	docker system prune -f
+.PHONY: stop
+stop: ## Stop all services
+	@echo "$(YELLOW)🛑 Stopping services...$(NC)"
+	@docker-compose -f $(COMPOSE_FILE) down
+	@docker-compose -f $(PROD_COMPOSE_FILE) down 2>/dev/null || true
+	@echo "$(GREEN)✅ Services stopped$(NC)"
 
-clean-docker:
-	@echo "🧹 Cleaning Docker resources..."
-	docker-compose down -v
-	docker system prune -af
-	docker volume prune -f
+.PHONY: restart
+restart: ## Restart all services
+	@echo "$(YELLOW)🔄 Restarting services...$(NC)"
+	@$(MAKE) stop
+	@$(MAKE) start-dev
 
-# Deployment helpers
-build-prod:
-	@echo "🏗️  Building production images..."
-	docker-compose -f docker-compose.prod.yml build
+.PHONY: restart-prod
+restart-prod: ## Restart production services
+	@echo "$(YELLOW)🔄 Restarting production services...$(NC)"
+	@docker-compose -f $(PROD_COMPOSE_FILE) down
+	@docker-compose -f $(PROD_COMPOSE_FILE) up -d
+	@echo "$(GREEN)✅ Production services restarted$(NC)"
 
-deploy-staging:
-	@echo "🚀 Deploying to staging..."
-	# Add staging deployment commands here
+.PHONY: status
+status: ## Show service status
+	@echo "$(BLUE)📊 Service Status$(NC)"
+	@docker-compose -f $(COMPOSE_FILE) ps 2>/dev/null || echo "Development services not running"
+	@docker-compose -f $(PROD_COMPOSE_FILE) ps 2>/dev/null || echo "Production services not running"
 
-deploy-prod:
-	@echo "🚀 Deploying to production..."
-	# Add production deployment commands here
+##@ Database Commands
 
-# Development utilities
-logs-backend:
-	docker-compose logs -f backend
+.PHONY: init-database
+init-database: ## Initialize database (development)
+	@echo "$(YELLOW)🗄️  Initializing database...$(NC)"
+	@sleep 10  # Wait for database to be ready
+	@docker-compose -f $(COMPOSE_FILE) exec backend alembic upgrade head
+	@docker-compose -f $(COMPOSE_FILE) exec backend python -m app.scripts.seed_roles
+	@echo "$(GREEN)✅ Database initialized$(NC)"
 
-logs-frontend:
-	docker-compose logs -f frontend
+.PHONY: init-database-prod
+init-database-prod: ## Initialize database (production)
+	@echo "$(YELLOW)🗄️  Initializing production database...$(NC)"
+	@sleep 10  # Wait for database to be ready
+	@docker-compose -f $(PROD_COMPOSE_FILE) exec backend alembic upgrade head
+	@docker-compose -f $(PROD_COMPOSE_FILE) exec backend python -m app.scripts.seed_roles
+	@echo "$(GREEN)✅ Production database initialized$(NC)"
 
-logs-db:
-	docker-compose logs -f postgres
+.PHONY: migrate
+migrate: ## Run database migrations
+	@echo "$(YELLOW)🔄 Running database migrations...$(NC)"
+	@docker-compose -f $(COMPOSE_FILE) exec backend alembic upgrade head
+	@echo "$(GREEN)✅ Database migrations completed$(NC)"
 
-shell-backend:
-	docker-compose exec backend bash
+.PHONY: migrate-prod
+migrate-prod: ## Run database migrations (production)
+	@echo "$(YELLOW)🔄 Running production database migrations...$(NC)"
+	@docker-compose -f $(PROD_COMPOSE_FILE) exec backend alembic upgrade head
+	@echo "$(GREEN)✅ Production database migrations completed$(NC)"
 
-shell-db:
-	docker-compose exec postgres psql -U pamuser -d pamdb
+.PHONY: db-shell
+db-shell: ## Access database shell
+	@echo "$(BLUE)💾 Opening database shell...$(NC)"
+	@docker-compose -f $(COMPOSE_FILE) exec database psql -U pamuser -d pamdb
 
-# Quick checks
-check: lint type-check security test
-	@echo "✅ All checks passed! Ready to commit."
+.PHONY: backup-db
+backup-db: ## Create database backup
+	@echo "$(YELLOW)💾 Creating database backup...$(NC)"
+	@mkdir -p $(BACKUP_DIR)
+	@docker-compose -f $(COMPOSE_FILE) exec -T database pg_dump -U pamuser -d pamdb > $(BACKUP_DIR)/backup-$(shell date +%Y%m%d_%H%M%S).sql
+	@echo "$(GREEN)✅ Database backup created in $(BACKUP_DIR)/$(NC)"
 
-# CI/CD simulation
-ci: install lint type-check security test docker-build
-	@echo "✅ CI pipeline simulation complete!"
+.PHONY: restore-db
+restore-db: ## Restore database from backup (requires BACKUP_FILE variable)
+	@echo "$(YELLOW)🔄 Restoring database from backup...$(NC)"
+	@if [ -z "$(BACKUP_FILE)" ]; then \
+		echo "$(RED)❌ Please specify BACKUP_FILE: make restore-db BACKUP_FILE=backup.sql$(NC)"; \
+		exit 1; \
+	fi
+	@docker-compose -f $(COMPOSE_FILE) exec -T database psql -U pamuser -d pamdb < $(BACKUP_FILE)
+	@echo "$(GREEN)✅ Database restored from $(BACKUP_FILE)$(NC)"
+
+##@ Monitoring Commands
+
+.PHONY: logs
+logs: ## Show application logs
+	@echo "$(BLUE)📋 Application Logs$(NC)"
+	@docker-compose -f $(COMPOSE_FILE) logs -f backend frontend
+
+.PHONY: logs-prod
+logs-prod: ## Show production logs
+	@echo "$(BLUE)📋 Production Logs$(NC)"
+	@docker-compose -f $(PROD_COMPOSE_FILE) logs -f backend frontend
+
+.PHONY: health
+health: ## Check application health
+	@echo "$(BLUE)🏥 Health Check$(NC)"
+	@curl -s http://localhost:8000/health | python -m json.tool 2>/dev/null || echo "Backend not responding"
+	@echo ""
+	@curl -s http://localhost:8000/health/ready | python -m json.tool 2>/dev/null || echo "Backend not ready"
+
+.PHONY: health-prod
+health-prod: ## Check production health
+	@echo "$(BLUE)🏥 Production Health Check$(NC)"
+	@curl -s https://$(shell grep DOMAIN .env | cut -d= -f2)/api/v1/health | python -m json.tool 2>/dev/null || echo "Production backend not responding"
+
+##@ Development Commands
+
+.PHONY: dev
+dev: ## Start development with hot reload
+	@echo "$(YELLOW)🔥 Starting development with hot reload...$(NC)"
+	@docker-compose -f $(COMPOSE_FILE) up
+
+.PHONY: shell-backend
+shell-backend: ## Access backend container shell
+	@echo "$(BLUE)🐚 Opening backend shell...$(NC)"
+	@docker-compose -f $(COMPOSE_FILE) exec backend bash
+
+.PHONY: shell-frontend
+shell-frontend: ## Access frontend container shell
+	@echo "$(BLUE)🐚 Opening frontend shell...$(NC)"
+	@docker-compose -f $(COMPOSE_FILE) exec frontend bash
+
+.PHONY: test
+test: ## Run tests
+	@echo "$(YELLOW)🧪 Running tests...$(NC)"
+	@docker-compose -f $(COMPOSE_FILE) exec backend pytest
+	@docker-compose -f $(COMPOSE_FILE) exec frontend npm test
+
+.PHONY: lint
+lint: ## Run linters
+	@echo "$(YELLOW)🔍 Running linters...$(NC)"
+	@docker-compose -f $(COMPOSE_FILE) exec backend black . --check
+	@docker-compose -f $(COMPOSE_FILE) exec backend flake8 .
+	@docker-compose -f $(COMPOSE_FILE) exec frontend npm run lint
+
+.PHONY: format
+format: ## Format code
+	@echo "$(YELLOW)✨ Formatting code...$(NC)"
+	@docker-compose -f $(COMPOSE_FILE) exec backend black .
+	@docker-compose -f $(COMPOSE_FILE) exec frontend npm run format
+
+##@ Maintenance Commands
+
+.PHONY: update
+update: ## Update application
+	@echo "$(YELLOW)📦 Updating application...$(NC)"
+	@git pull origin main
+	@$(MAKE) pull
+	@$(MAKE) build
+	@$(MAKE) migrate
+	@$(MAKE) restart
+	@echo "$(GREEN)✅ Application updated$(NC)"
+
+.PHONY: update-prod
+update-prod: ## Update production application
+	@echo "$(YELLOW)📦 Updating production application...$(NC)"
+	@git pull origin main
+	@docker-compose -f $(PROD_COMPOSE_FILE) pull
+	@$(MAKE) build-prod
+	@$(MAKE) migrate-prod
+	@$(MAKE) restart-prod
+	@echo "$(GREEN)✅ Production application updated$(NC)"
+
+.PHONY: clean
+clean: ## Clean up Docker resources
+	@echo "$(YELLOW)🧹 Cleaning up Docker resources...$(NC)"
+	@docker-compose -f $(COMPOSE_FILE) down -v --remove-orphans
+	@docker-compose -f $(PROD_COMPOSE_FILE) down -v --remove-orphans 2>/dev/null || true
+	@docker system prune -f
+	@echo "$(GREEN)✅ Cleanup completed$(NC)"
+
+.PHONY: reset
+reset: ## Reset everything (⚠️ DESTROYS ALL DATA)
+	@echo "$(RED)⚠️  WARNING: This will destroy all data!$(NC)"
+	@echo "$(YELLOW)Press Ctrl+C to cancel, or Enter to continue...$(NC)"
+	@read
+	@$(MAKE) clean
+	@sudo rm -rf data/postgres data/redis $(BACKUP_DIR) $(LOG_DIR)
+	@echo "$(GREEN)✅ Everything reset$(NC)"
+
+##@ Security Commands
+
+.PHONY: generate-secrets
+generate-secrets: ## Generate secure secrets for .env file
+	@echo "$(YELLOW)🔐 Generating secure secrets...$(NC)"
+	@echo "SECRET_KEY=$(shell openssl rand -hex 32)"
+	@echo "ENCRYPTION_KEY=$(shell openssl rand -hex 32)"
+	@echo "POSTGRES_PASSWORD=$(shell openssl rand -base64 32)"
+	@echo "REDIS_PASSWORD=$(shell openssl rand -base64 32)"
+	@echo "$(BLUE)Copy these values to your .env file$(NC)"
+
+.PHONY: check-security
+check-security: ## Run security checks
+	@echo "$(YELLOW)🔍 Running security checks...$(NC)"
+	@docker run --rm -v $(PWD):/app securecodewarrior/docker-security-checker /app 2>/dev/null || echo "Security scanner not available"
+	@echo "$(GREEN)✅ Security checks completed$(NC)"
+
+##@ Information Commands
+
+.PHONY: info
+info: ## Show deployment information
+	@echo "$(BLUE)📊 Menshun PAM Deployment Information$(NC)"
+	@echo "$(BLUE)================================$(NC)"
+	@echo "Environment: $(shell grep ENVIRONMENT .env 2>/dev/null | cut -d= -f2 || echo 'Not configured')"
+	@echo "Domain: $(shell grep DOMAIN .env 2>/dev/null | cut -d= -f2 || echo 'Not configured')"
+	@echo "Azure Tenant: $(shell grep AZURE_TENANT_ID .env 2>/dev/null | cut -d= -f2 || echo 'Not configured')"
+	@echo ""
+	@echo "$(BLUE)Access URLs:$(NC)"
+	@echo "Frontend: http://localhost:3000"
+	@echo "Backend API: http://localhost:8000"
+	@echo "API Docs: http://localhost:8000/docs"
+	@echo "Database: localhost:5432"
+	@echo "Redis: localhost:6379"
+
+.PHONY: post-deploy-info
+post-deploy-info: ## Show post-deployment information
+	@echo "$(GREEN)🎉 Menshun PAM Development Environment Ready!$(NC)"
+	@echo "$(BLUE)================================$(NC)"
+	@echo ""
+	@echo "$(YELLOW)📋 Next Steps:$(NC)"
+	@echo "1. Open http://localhost:3000 in your browser"
+	@echo "2. Complete the guided setup wizard"
+	@echo "3. Configure your Azure AD credentials"
+	@echo "4. Start managing privileged access!"
+	@echo ""
+	@echo "$(YELLOW)🔧 Useful Commands:$(NC)"
+	@echo "• make logs        - View application logs"
+	@echo "• make health      - Check application health"
+	@echo "• make status      - Show service status"
+	@echo "• make stop        - Stop all services"
+	@echo "• make help        - Show all available commands"
+
+.PHONY: post-deploy-info-prod
+post-deploy-info-prod: ## Show post-deployment information (production)
+	@echo "$(GREEN)🎉 Menshun PAM Production Environment Ready!$(NC)"
+	@echo "$(BLUE)================================$(NC)"
+	@echo ""
+	@echo "$(YELLOW)📋 Next Steps:$(NC)"
+	@echo "1. Configure your domain DNS to point to this server"
+	@echo "2. Setup proper SSL certificates (replace self-signed)"
+	@echo "3. Open https://$(shell grep DOMAIN .env | cut -d= -f2) in your browser"
+	@echo "4. Complete the guided setup wizard"
+	@echo "5. Configure monitoring and backups"
+	@echo ""
+	@echo "$(YELLOW)🔧 Production Commands:$(NC)"
+	@echo "• make logs-prod     - View production logs"
+	@echo "• make health-prod   - Check production health"
+	@echo "• make backup-db     - Create database backup"
+	@echo "• make update-prod   - Update production deployment"
+
+.PHONY: version
+version: ## Show version information
+	@echo "$(BLUE)Menshun PAM Version Information$(NC)"
+	@echo "Git commit: $(shell git rev-parse --short HEAD 2>/dev/null || echo 'Unknown')"
+	@echo "Git branch: $(shell git rev-parse --abbrev-ref HEAD 2>/dev/null || echo 'Unknown')"
+	@echo "Docker version: $(shell docker --version 2>/dev/null || echo 'Not installed')"
+	@echo "Docker Compose version: $(shell docker-compose --version 2>/dev/null || echo 'Not installed')"

@@ -21,6 +21,7 @@ from fastapi.responses import JSONResponse
 
 from app import get_package_info, get_version, logger
 from app.core.config import get_settings
+from app.api.v1.setup import router as setup_router
 
 # Get application settings
 settings = get_settings()
@@ -157,6 +158,9 @@ def create_application() -> FastAPI:
     
     # Add compression middleware
     application.add_middleware(GZipMiddleware, minimum_size=1000)
+    
+    # Include API routers
+    application.include_router(setup_router, prefix="/api/v1")
     
     return application
 
@@ -371,6 +375,10 @@ def custom_openapi():
         {
             "name": "Health",
             "description": "Health check and monitoring endpoints for service status"
+        },
+        {
+            "name": "Setup & Configuration",
+            "description": "Initial setup wizard and system configuration endpoints"
         },
         {
             "name": "Authentication",
