@@ -36,8 +36,7 @@ python-multipart==0.0.6             # Multipart form data parser
 # =============================================================================
 # Microsoft Graph Integration
 # =============================================================================
-msgraph-core==0.2.2                 # Microsoft Graph core library
-msgraph-sdk==1.0.0                  # Microsoft Graph SDK for Python
+msgraph-sdk==1.0.0                  # Microsoft Graph SDK for Python (includes msgraph-core)
 azure-identity==1.15.0              # Azure identity authentication
 azure-keyvault-secrets==4.7.0       # Azure Key Vault client library
 
