@@ -62,7 +62,7 @@ class ServiceIdentity(FullBaseModel):
     )
     
     identity_type: Mapped[ServiceIdentityType] = mapped_column(
-        Enum(ServiceIdentityType),
+        Enum(ServiceIdentityType, name="service_identity_type_enum"),
         nullable=False,
         index=True,
         doc="Type of service identity"
