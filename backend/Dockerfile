@@ -47,7 +47,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN groupadd -r menshun && useradd -r -g menshun -d /app -s /bin/bash menshun
 
 # Create application directories
-RUN mkdir -p /app/logs /app/vault_data /app/temp \
+RUN mkdir -p /app/logs /app/vault_data /app/temp /app/alembic/versions \
     && chown -R menshun:menshun /app
 
 # =============================================================================
@@ -80,6 +80,9 @@ ENV ENVIRONMENT=development \
 # Copy application code
 WORKDIR /app
 COPY --chown=menshun:menshun . .
+
+# Ensure alembic directories exist with proper permissions
+RUN mkdir -p /app/alembic/versions && chown -R menshun:menshun /app/alembic
 
 # Install the application in development mode
 RUN pip install -e .
@@ -128,6 +131,9 @@ WORKDIR /app
 COPY --chown=menshun:menshun app/ ./app/
 COPY --chown=menshun:menshun alembic.ini pyproject.toml ./
 COPY --chown=menshun:menshun alembic/ ./alembic/
+
+# Ensure alembic directories exist with proper permissions
+RUN mkdir -p /app/alembic/versions && chown -R menshun:menshun /app/alembic
 
 # Copy configuration files
 COPY --chown=menshun:menshun scripts/ ./scripts/
