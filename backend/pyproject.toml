@@ -2,7 +2,7 @@
 # This file contains configuration for build tools, linting, testing, and project metadata
 
 [build-system]
-requires = ["setuptools>=65.0", "wheel", "setuptools-scm>=8.0"]
+requires = ["setuptools>=65.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -41,10 +41,10 @@ dependencies = [
     "sqlalchemy>=2.0.23",
     "alembic>=1.12.1",
     "psycopg2-binary>=2.9.9",
-    "redis>=5.0.1",
+    "redis>=4.6.0",
     "celery[redis]>=5.3.4",
     "msal>=1.25.0",
-    "microsoft-graph>=1.3.0",
+    "msgraph-sdk>=1.0.0",
     "azure-identity>=1.15.0",
     "azure-keyvault-secrets>=4.7.0",
     "pydantic[email]>=2.5.0",
@@ -56,7 +56,7 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "httpx>=0.25.2",
 ]
-dynamic = ["version"]
+version = "1.0.0-dev"
 
 [project.optional-dependencies]
 dev = [
@@ -113,10 +113,7 @@ where = ["."]
 include = ["app*"]
 exclude = ["tests*", "*.tests*"]
 
-[tool.setuptools_scm]
-write_to = "app/_version.py"
-version_scheme = "guess-next-dev"
-local_scheme = "dirty-tag"
+# Note: Using static version instead of setuptools_scm for Docker compatibility
 
 # =============================================================================
 # Black Code Formatter
