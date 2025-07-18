@@ -8,6 +8,7 @@ Identities, and Workload Identities in Azure AD environments.
 
 import uuid
 from datetime import datetime
+from enum import Enum as PythonEnum
 from typing import List, Optional
 
 from sqlalchemy import Boolean, DateTime, Enum, Index, String, Text, UniqueConstraint
@@ -17,7 +18,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import FullBaseModel
 
 
-class ServiceIdentityType(str, Enum):
+class ServiceIdentityType(str, PythonEnum):
     """Enumeration of supported service identity types."""
     SERVICE_ACCOUNT = "service_account"
     SERVICE_PRINCIPAL = "service_principal"

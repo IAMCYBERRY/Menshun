@@ -8,6 +8,7 @@ other sensitive authentication materials with comprehensive audit trails.
 
 import uuid
 from datetime import datetime, timedelta
+from enum import Enum as PythonEnum
 from typing import List, Optional
 
 from sqlalchemy import (
@@ -20,7 +21,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import FullBaseModel
 
 
-class CredentialType(str, Enum):
+class CredentialType(str, PythonEnum):
     """Enumeration of supported credential types."""
     PASSWORD = "password"
     CLIENT_SECRET = "client_secret"
@@ -30,7 +31,7 @@ class CredentialType(str, Enum):
     SSH_KEY = "ssh_key"
 
 
-class CredentialStatus(str, Enum):
+class CredentialStatus(str, PythonEnum):
     """Enumeration of credential status values."""
     ACTIVE = "active"
     EXPIRED = "expired"
@@ -39,7 +40,7 @@ class CredentialStatus(str, Enum):
     PENDING_ROTATION = "pending_rotation"
 
 
-class RotationStatus(str, Enum):
+class RotationStatus(str, PythonEnum):
     """Enumeration of rotation status values."""
     SCHEDULED = "scheduled"
     IN_PROGRESS = "in_progress"
