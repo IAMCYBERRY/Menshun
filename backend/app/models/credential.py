@@ -79,7 +79,7 @@ class Credential(FullBaseModel):
     # =============================================================================
     
     credential_type: Mapped[CredentialType] = mapped_column(
-        Enum(CredentialType, name="credential_type_enum"),
+        Enum(*[e.value for e in CredentialType], name="credential_type_enum"),
         nullable=False,
         index=True,
         doc="Type of credential being stored"
@@ -148,7 +148,7 @@ class Credential(FullBaseModel):
     # =============================================================================
     
     status: Mapped[CredentialStatus] = mapped_column(
-        Enum(CredentialStatus, name="credential_status_enum"),
+        Enum(*[e.value for e in CredentialStatus], name="credential_status_enum"),
         nullable=False,
         default=CredentialStatus.ACTIVE,
         index=True,
@@ -525,7 +525,7 @@ class CredentialRotation(FullBaseModel):
     # =============================================================================
     
     status: Mapped[RotationStatus] = mapped_column(
-        Enum(RotationStatus, name="rotation_status_enum"),
+        Enum(*[e.value for e in RotationStatus], name="rotation_status_enum"),
         nullable=False,
         default=RotationStatus.SCHEDULED,
         index=True,
