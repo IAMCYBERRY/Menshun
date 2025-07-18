@@ -355,8 +355,7 @@ class DirectoryRole(FullBaseModel):
         ),
         Index(
             "ix_directory_roles_assignment_count",
-            "assignment_count",
-            postgresql_where="is_enabled = true"
+            "assignment_count"
         ),
         
         # Full-text search index for role names and descriptions

@@ -331,18 +331,18 @@ class RoleAssignment(FullBaseModel):
         Index(
             "ix_role_assignments_expiry",
             "expires_at",
-            postgresql_where="expires_at IS NOT NULL AND is_active = true"
+            # postgresql_where="expires_at IS NOT NULL AND is_active = true"  # Temporarily commented out for initial migration
         ),
         Index(
             "ix_role_assignments_certification",
             "next_certification_date",
-            postgresql_where="requires_certification = true AND is_active = true"
+            # postgresql_where="requires_certification = true AND is_active = true"  # Temporarily commented out for initial migration
         ),
         Index(
             "ix_role_assignments_emergency",
             "is_emergency",
             "assigned_at",
-            postgresql_where="is_emergency = true"
+            # postgresql_where="is_emergency = true"  # Temporarily commented out for initial migration
         ),
         Index(
             "ix_role_assignments_sync_status",

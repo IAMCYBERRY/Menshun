@@ -364,7 +364,7 @@ class User(FullBaseModel):
         Index(
             "ix_privileged_users_active_upn",
             "upn",
-            postgresql_where="is_active = true AND is_deleted = false"
+            # postgresql_where="is_active = true AND is_deleted = false"  # Temporarily commented out for initial migration
         ),
     )
     

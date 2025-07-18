@@ -338,13 +338,13 @@ class Credential(FullBaseModel):
             "ix_credentials_rotation_schedule",
             "next_rotation_date",
             "auto_rotation_enabled",
-            postgresql_where="next_rotation_date IS NOT NULL AND auto_rotation_enabled = true"
+            # postgresql_where="next_rotation_date IS NOT NULL AND auto_rotation_enabled = true"  # Temporarily commented out for initial migration
         ),
         Index(
             "ix_credentials_expiry",
             "expires_at",
             "status",
-            postgresql_where="expires_at IS NOT NULL AND status = 'active'"
+            # postgresql_where="expires_at IS NOT NULL AND status = 'active'"  # Temporarily commented out for initial migration
         ),
         Index(
             "ix_credentials_usage",
@@ -356,7 +356,7 @@ class Credential(FullBaseModel):
         Index(
             "ix_credentials_active_name",
             "name",
-            postgresql_where="status = 'active' AND is_deleted = false"
+            # postgresql_where="status = 'active' AND is_deleted = false"  # Temporarily commented out for initial migration
         ),
     )
     
@@ -681,7 +681,7 @@ class CredentialRotation(FullBaseModel):
         Index(
             "ix_credential_rotations_retry",
             "next_retry_at",
-            postgresql_where="next_retry_at IS NOT NULL AND status = 'failed'"
+            # postgresql_where="next_retry_at IS NOT NULL AND status = 'failed'"  # Temporarily commented out for initial migration
         ),
     )
     

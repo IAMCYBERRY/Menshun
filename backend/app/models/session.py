@@ -350,7 +350,7 @@ class Session(FullBaseModel):
             "ix_sessions_expiry_cleanup",
             "expires_at",
             "is_active",
-            postgresql_where="is_active = true"
+            # postgresql_where="is_active = true"  # Temporarily commented out for initial migration
         ),
         Index(
             "ix_sessions_geographic",
@@ -362,7 +362,7 @@ class Session(FullBaseModel):
         Index(
             "ix_sessions_active_activity",
             "last_activity",
-            postgresql_where="is_active = true"
+            # postgresql_where="is_active = true"  # Temporarily commented out for initial migration
         ),
     )
     

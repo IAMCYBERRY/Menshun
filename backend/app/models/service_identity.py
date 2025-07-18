@@ -437,19 +437,19 @@ class ServiceIdentity(FullBaseModel):
         Index(
             "ix_service_identities_rotation",
             "next_rotation_date",
-            postgresql_where="next_rotation_date IS NOT NULL AND is_active = true"
+            # postgresql_where="next_rotation_date IS NOT NULL AND is_active = true"  # Temporarily commented out for initial migration
         ),
         Index(
             "ix_service_identities_expiration",
             "expires_at",
-            postgresql_where="expires_at IS NOT NULL AND is_active = true"
+            # postgresql_where="expires_at IS NOT NULL AND is_active = true"  # Temporarily commented out for initial migration
         ),
         
         # Partial indexes for active identities
         Index(
             "ix_service_identities_active_name",
             "name",
-            postgresql_where="is_active = true AND is_deleted = false"
+            # postgresql_where="is_active = true AND is_deleted = false"  # Temporarily commented out for initial migration
         ),
         
         # Full-text search index
