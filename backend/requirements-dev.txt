@@ -180,7 +180,7 @@ xenon==0.9.1                        # Code complexity monitoring
 # Import Analysis
 # =============================================================================
 isort==5.12.0                       # Import statement sorter
-unused-import==0.1.0                # Find unused imports
+# Note: unused imports can be found using flake8-import-order
 
 # =============================================================================
 # Development Debugging
