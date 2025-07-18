@@ -147,44 +147,42 @@ RUN apt-get update && apt-get remove -y gcc g++ \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 # Create startup script
-RUN cat > /app/start.sh << 'EOF'
-#!/bin/bash
-set -e
-
-echo "Starting Menshun Backend..."
-echo "Environment: $ENVIRONMENT"
-echo "Build Date: $BUILD_DATE"
-echo "VCS Ref: $VCS_REF"
-
-# Wait for database
-echo "Waiting for database connection..."
-python scripts/wait_for_db.py
-
-# Run database migrations
-echo "Running database migrations..."
-alembic upgrade head
-
-# Seed directory roles if needed
-echo "Seeding directory roles..."
-python -m app.scripts.seed_roles --if-empty
-
-# Start the application
-echo "Starting FastAPI server..."
-exec gunicorn app.main:app \
-    --bind 0.0.0.0:8000 \
-    --workers ${WORKERS:-4} \
-    --worker-class uvicorn.workers.UvicornWorker \
-    --worker-connections ${WORKER_CONNECTIONS:-1000} \
-    --max-requests ${MAX_REQUESTS:-1000} \
-    --max-requests-jitter ${MAX_REQUESTS_JITTER:-100} \
-    --timeout ${TIMEOUT:-30} \
-    --keep-alive ${KEEP_ALIVE:-5} \
-    --log-level ${LOG_LEVEL:-info} \
-    --access-logfile - \
-    --error-logfile - \
-    --capture-output \
-    --enable-stdio-inheritance
-EOF
+RUN echo '#!/bin/bash' > /app/start.sh && \
+    echo 'set -e' >> /app/start.sh && \
+    echo '' >> /app/start.sh && \
+    echo 'echo "Starting Menshun Backend..."' >> /app/start.sh && \
+    echo 'echo "Environment: $ENVIRONMENT"' >> /app/start.sh && \
+    echo 'echo "Build Date: $BUILD_DATE"' >> /app/start.sh && \
+    echo 'echo "VCS Ref: $VCS_REF"' >> /app/start.sh && \
+    echo '' >> /app/start.sh && \
+    echo '# Wait for database' >> /app/start.sh && \
+    echo 'echo "Waiting for database connection..."' >> /app/start.sh && \
+    echo 'python scripts/wait_for_db.py' >> /app/start.sh && \
+    echo '' >> /app/start.sh && \
+    echo '# Run database migrations' >> /app/start.sh && \
+    echo 'echo "Running database migrations..."' >> /app/start.sh && \
+    echo 'alembic upgrade head' >> /app/start.sh && \
+    echo '' >> /app/start.sh && \
+    echo '# Seed directory roles if needed' >> /app/start.sh && \
+    echo 'echo "Seeding directory roles..."' >> /app/start.sh && \
+    echo 'python -m app.scripts.seed_roles --if-empty' >> /app/start.sh && \
+    echo '' >> /app/start.sh && \
+    echo '# Start the application' >> /app/start.sh && \
+    echo 'echo "Starting FastAPI server..."' >> /app/start.sh && \
+    echo 'exec gunicorn app.main:app \' >> /app/start.sh && \
+    echo '    --bind 0.0.0.0:8000 \' >> /app/start.sh && \
+    echo '    --workers ${WORKERS:-4} \' >> /app/start.sh && \
+    echo '    --worker-class uvicorn.workers.UvicornWorker \' >> /app/start.sh && \
+    echo '    --worker-connections ${WORKER_CONNECTIONS:-1000} \' >> /app/start.sh && \
+    echo '    --max-requests ${MAX_REQUESTS:-1000} \' >> /app/start.sh && \
+    echo '    --max-requests-jitter ${MAX_REQUESTS_JITTER:-100} \' >> /app/start.sh && \
+    echo '    --timeout ${TIMEOUT:-30} \' >> /app/start.sh && \
+    echo '    --keep-alive ${KEEP_ALIVE:-5} \' >> /app/start.sh && \
+    echo '    --log-level ${LOG_LEVEL:-info} \' >> /app/start.sh && \
+    echo '    --access-logfile - \' >> /app/start.sh && \
+    echo '    --error-logfile - \' >> /app/start.sh && \
+    echo '    --capture-output \' >> /app/start.sh && \
+    echo '    --enable-stdio-inheritance' >> /app/start.sh
 
 RUN chmod +x /app/start.sh
 

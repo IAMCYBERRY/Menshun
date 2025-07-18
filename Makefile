@@ -14,8 +14,8 @@ BACKUP_DIR := ./backups
 LOG_DIR := ./logs
 
 # Docker command - automatically use sudo if user is not in docker group
-DOCKER_CMD := $(shell if groups | grep -q docker || [ "$$EUID" -eq 0 ]; then echo "docker"; else echo "sudo docker"; fi)
-DOCKER_COMPOSE_CMD := $(shell if groups | grep -q docker || [ "$$EUID" -eq 0 ]; then echo "docker-compose"; else echo "sudo docker-compose"; fi)
+DOCKER_CMD := $(shell if groups | grep -q docker || [ "$$(id -u)" -eq 0 ]; then echo "docker"; else echo "sudo docker"; fi)
+DOCKER_COMPOSE_CMD := $(shell if groups | grep -q docker || [ "$$(id -u)" -eq 0 ]; then echo "docker-compose"; else echo "sudo docker-compose"; fi)
 
 # Colors for terminal output
 RED := \033[0;31m
@@ -69,7 +69,7 @@ check-requirements: ## Check system requirements
 	@command -v docker >/dev/null 2>&1 || { echo "$(RED)❌ Docker is not installed$(NC)"; exit 1; }
 	@command -v docker-compose >/dev/null 2>&1 || command -v docker >/dev/null 2>&1 && $(DOCKER_CMD) compose version >/dev/null 2>&1 || { echo "$(RED)❌ Docker Compose is not installed$(NC)"; exit 1; }
 	@command -v git >/dev/null 2>&1 || { echo "$(RED)❌ Git is not installed$(NC)"; exit 1; }
-	@if ! groups | grep -q docker && [ "$$EUID" -ne 0 ]; then echo "$(YELLOW)⚠️ User not in docker group - will use sudo for Docker commands$(NC)"; fi
+	@if ! groups | grep -q docker && [ "$$(id -u)" -ne 0 ]; then echo "$(YELLOW)⚠️ User not in docker group - will use sudo for Docker commands$(NC)"; fi
 	@echo "$(GREEN)✅ All requirements satisfied$(NC)"
 
 .PHONY: setup-directories
