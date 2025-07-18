@@ -1,5 +1,10 @@
 # Menshun PAM - Simplified Deployment Makefile
 # This Makefile provides easy commands to deploy and manage Menshun PAM
+# 
+# Docker Permission Handling:
+# - Automatically detects if user is in 'docker' group
+# - Uses 'sudo' for Docker commands if user lacks Docker permissions
+# - Works seamlessly regardless of Docker installation method (package/snap)
 
 # Variables
 COMPOSE_FILE := docker-compose.yml
@@ -7,6 +12,10 @@ PROD_COMPOSE_FILE := docker-compose.prod.yml
 PROJECT_NAME := menshun-pam
 BACKUP_DIR := ./backups
 LOG_DIR := ./logs
+
+# Docker command - automatically use sudo if user is not in docker group
+DOCKER_CMD := $(shell if groups | grep -q docker || [ "$$EUID" -eq 0 ]; then echo "docker"; else echo "sudo docker"; fi)
+DOCKER_COMPOSE_CMD := $(shell if groups | grep -q docker || [ "$$EUID" -eq 0 ]; then echo "docker-compose"; else echo "sudo docker-compose"; fi)
 
 # Colors for terminal output
 RED := \033[0;31m
@@ -58,8 +67,9 @@ init-prod: ## 🏢 Initialize and deploy Menshun PAM (production)
 check-requirements: ## Check system requirements
 	@echo "$(YELLOW)📋 Checking system requirements...$(NC)"
 	@command -v docker >/dev/null 2>&1 || { echo "$(RED)❌ Docker is not installed$(NC)"; exit 1; }
-	@command -v docker-compose >/dev/null 2>&1 || { echo "$(RED)❌ Docker Compose is not installed$(NC)"; exit 1; }
+	@command -v docker-compose >/dev/null 2>&1 || command -v docker >/dev/null 2>&1 && $(DOCKER_CMD) compose version >/dev/null 2>&1 || { echo "$(RED)❌ Docker Compose is not installed$(NC)"; exit 1; }
 	@command -v git >/dev/null 2>&1 || { echo "$(RED)❌ Git is not installed$(NC)"; exit 1; }
+	@if ! groups | grep -q docker && [ "$$EUID" -ne 0 ]; then echo "$(YELLOW)⚠️ User not in docker group - will use sudo for Docker commands$(NC)"; fi
 	@echo "$(GREEN)✅ All requirements satisfied$(NC)"
 
 .PHONY: setup-directories
@@ -123,37 +133,37 @@ setup-ssl: ## Setup SSL certificates
 .PHONY: build
 build: ## Build all Docker images
 	@echo "$(YELLOW)🔨 Building Docker images...$(NC)"
-	@docker-compose -f $(COMPOSE_FILE) build
+	@$(DOCKER_COMPOSE_CMD) -f $(COMPOSE_FILE) build
 
 .PHONY: build-prod
 build-prod: ## Build production Docker images
 	@echo "$(YELLOW)🔨 Building production Docker images...$(NC)"
-	@docker-compose -f $(PROD_COMPOSE_FILE) build
+	@$(DOCKER_COMPOSE_CMD) -f $(PROD_COMPOSE_FILE) build
 
 .PHONY: pull
 pull: ## Pull latest Docker images
 	@echo "$(YELLOW)📥 Pulling latest Docker images...$(NC)"
-	@docker-compose -f $(COMPOSE_FILE) pull
+	@$(DOCKER_COMPOSE_CMD) -f $(COMPOSE_FILE) pull
 
 ##@ Service Management
 
 .PHONY: start-dev
 start-dev: ## Start development services
 	@echo "$(YELLOW)🚀 Starting development services...$(NC)"
-	@docker-compose -f $(COMPOSE_FILE) up -d
+	@$(DOCKER_COMPOSE_CMD) -f $(COMPOSE_FILE) up -d
 	@echo "$(GREEN)✅ Development services started$(NC)"
 
 .PHONY: start-prod
 start-prod: ## Start production services
 	@echo "$(YELLOW)🚀 Starting production services...$(NC)"
-	@docker-compose -f $(PROD_COMPOSE_FILE) up -d
+	@$(DOCKER_COMPOSE_CMD) -f $(PROD_COMPOSE_FILE) up -d
 	@echo "$(GREEN)✅ Production services started$(NC)"
 
 .PHONY: stop
 stop: ## Stop all services
 	@echo "$(YELLOW)🛑 Stopping services...$(NC)"
-	@docker-compose -f $(COMPOSE_FILE) down
-	@docker-compose -f $(PROD_COMPOSE_FILE) down 2>/dev/null || true
+	@$(DOCKER_COMPOSE_CMD) -f $(COMPOSE_FILE) down
+	@$(DOCKER_COMPOSE_CMD) -f $(PROD_COMPOSE_FILE) down 2>/dev/null || true
 	@echo "$(GREEN)✅ Services stopped$(NC)"
 
 .PHONY: restart
@@ -165,15 +175,15 @@ restart: ## Restart all services
 .PHONY: restart-prod
 restart-prod: ## Restart production services
 	@echo "$(YELLOW)🔄 Restarting production services...$(NC)"
-	@docker-compose -f $(PROD_COMPOSE_FILE) down
-	@docker-compose -f $(PROD_COMPOSE_FILE) up -d
+	@$(DOCKER_COMPOSE_CMD) -f $(PROD_COMPOSE_FILE) down
+	@$(DOCKER_COMPOSE_CMD) -f $(PROD_COMPOSE_FILE) up -d
 	@echo "$(GREEN)✅ Production services restarted$(NC)"
 
 .PHONY: status
 status: ## Show service status
 	@echo "$(BLUE)📊 Service Status$(NC)"
-	@docker-compose -f $(COMPOSE_FILE) ps 2>/dev/null || echo "Development services not running"
-	@docker-compose -f $(PROD_COMPOSE_FILE) ps 2>/dev/null || echo "Production services not running"
+	@$(DOCKER_COMPOSE_CMD) -f $(COMPOSE_FILE) ps 2>/dev/null || echo "Development services not running"
+	@$(DOCKER_COMPOSE_CMD) -f $(PROD_COMPOSE_FILE) ps 2>/dev/null || echo "Production services not running"
 
 ##@ Database Commands
 
@@ -181,40 +191,40 @@ status: ## Show service status
 init-database: ## Initialize database (development)
 	@echo "$(YELLOW)🗄️  Initializing database...$(NC)"
 	@sleep 10  # Wait for database to be ready
-	@docker-compose -f $(COMPOSE_FILE) exec backend alembic upgrade head
-	@docker-compose -f $(COMPOSE_FILE) exec backend python -m app.scripts.seed_roles
+	@$(DOCKER_COMPOSE_CMD) -f $(COMPOSE_FILE) exec backend alembic upgrade head
+	@$(DOCKER_COMPOSE_CMD) -f $(COMPOSE_FILE) exec backend python -m app.scripts.seed_roles
 	@echo "$(GREEN)✅ Database initialized$(NC)"
 
 .PHONY: init-database-prod
 init-database-prod: ## Initialize database (production)
 	@echo "$(YELLOW)🗄️  Initializing production database...$(NC)"
 	@sleep 10  # Wait for database to be ready
-	@docker-compose -f $(PROD_COMPOSE_FILE) exec backend alembic upgrade head
-	@docker-compose -f $(PROD_COMPOSE_FILE) exec backend python -m app.scripts.seed_roles
+	@$(DOCKER_COMPOSE_CMD) -f $(PROD_COMPOSE_FILE) exec backend alembic upgrade head
+	@$(DOCKER_COMPOSE_CMD) -f $(PROD_COMPOSE_FILE) exec backend python -m app.scripts.seed_roles
 	@echo "$(GREEN)✅ Production database initialized$(NC)"
 
 .PHONY: migrate
 migrate: ## Run database migrations
 	@echo "$(YELLOW)🔄 Running database migrations...$(NC)"
-	@docker-compose -f $(COMPOSE_FILE) exec backend alembic upgrade head
+	@$(DOCKER_COMPOSE_CMD) -f $(COMPOSE_FILE) exec backend alembic upgrade head
 	@echo "$(GREEN)✅ Database migrations completed$(NC)"
 
 .PHONY: migrate-prod
 migrate-prod: ## Run database migrations (production)
 	@echo "$(YELLOW)🔄 Running production database migrations...$(NC)"
-	@docker-compose -f $(PROD_COMPOSE_FILE) exec backend alembic upgrade head
+	@$(DOCKER_COMPOSE_CMD) -f $(PROD_COMPOSE_FILE) exec backend alembic upgrade head
 	@echo "$(GREEN)✅ Production database migrations completed$(NC)"
 
 .PHONY: db-shell
 db-shell: ## Access database shell
 	@echo "$(BLUE)💾 Opening database shell...$(NC)"
-	@docker-compose -f $(COMPOSE_FILE) exec database psql -U pamuser -d pamdb
+	@$(DOCKER_COMPOSE_CMD) -f $(COMPOSE_FILE) exec database psql -U pamuser -d pamdb
 
 .PHONY: backup-db
 backup-db: ## Create database backup
 	@echo "$(YELLOW)💾 Creating database backup...$(NC)"
 	@mkdir -p $(BACKUP_DIR)
-	@docker-compose -f $(COMPOSE_FILE) exec -T database pg_dump -U pamuser -d pamdb > $(BACKUP_DIR)/backup-$(shell date +%Y%m%d_%H%M%S).sql
+	@$(DOCKER_COMPOSE_CMD) -f $(COMPOSE_FILE) exec -T database pg_dump -U pamuser -d pamdb > $(BACKUP_DIR)/backup-$(shell date +%Y%m%d_%H%M%S).sql
 	@echo "$(GREEN)✅ Database backup created in $(BACKUP_DIR)/$(NC)"
 
 .PHONY: restore-db
@@ -224,7 +234,7 @@ restore-db: ## Restore database from backup (requires BACKUP_FILE variable)
 		echo "$(RED)❌ Please specify BACKUP_FILE: make restore-db BACKUP_FILE=backup.sql$(NC)"; \
 		exit 1; \
 	fi
-	@docker-compose -f $(COMPOSE_FILE) exec -T database psql -U pamuser -d pamdb < $(BACKUP_FILE)
+	@$(DOCKER_COMPOSE_CMD) -f $(COMPOSE_FILE) exec -T database psql -U pamuser -d pamdb < $(BACKUP_FILE)
 	@echo "$(GREEN)✅ Database restored from $(BACKUP_FILE)$(NC)"
 
 ##@ Monitoring Commands
@@ -232,12 +242,12 @@ restore-db: ## Restore database from backup (requires BACKUP_FILE variable)
 .PHONY: logs
 logs: ## Show application logs
 	@echo "$(BLUE)📋 Application Logs$(NC)"
-	@docker-compose -f $(COMPOSE_FILE) logs -f backend frontend
+	@$(DOCKER_COMPOSE_CMD) -f $(COMPOSE_FILE) logs -f backend frontend
 
 .PHONY: logs-prod
 logs-prod: ## Show production logs
 	@echo "$(BLUE)📋 Production Logs$(NC)"
-	@docker-compose -f $(PROD_COMPOSE_FILE) logs -f backend frontend
+	@$(DOCKER_COMPOSE_CMD) -f $(PROD_COMPOSE_FILE) logs -f backend frontend
 
 .PHONY: health
 health: ## Check application health
@@ -256,36 +266,36 @@ health-prod: ## Check production health
 .PHONY: dev
 dev: ## Start development with hot reload
 	@echo "$(YELLOW)🔥 Starting development with hot reload...$(NC)"
-	@docker-compose -f $(COMPOSE_FILE) up
+	@$(DOCKER_COMPOSE_CMD) -f $(COMPOSE_FILE) up
 
 .PHONY: shell-backend
 shell-backend: ## Access backend container shell
 	@echo "$(BLUE)🐚 Opening backend shell...$(NC)"
-	@docker-compose -f $(COMPOSE_FILE) exec backend bash
+	@$(DOCKER_COMPOSE_CMD) -f $(COMPOSE_FILE) exec backend bash
 
 .PHONY: shell-frontend
 shell-frontend: ## Access frontend container shell
 	@echo "$(BLUE)🐚 Opening frontend shell...$(NC)"
-	@docker-compose -f $(COMPOSE_FILE) exec frontend bash
+	@$(DOCKER_COMPOSE_CMD) -f $(COMPOSE_FILE) exec frontend bash
 
 .PHONY: test
 test: ## Run tests
 	@echo "$(YELLOW)🧪 Running tests...$(NC)"
-	@docker-compose -f $(COMPOSE_FILE) exec backend pytest
-	@docker-compose -f $(COMPOSE_FILE) exec frontend npm test
+	@$(DOCKER_COMPOSE_CMD) -f $(COMPOSE_FILE) exec backend pytest
+	@$(DOCKER_COMPOSE_CMD) -f $(COMPOSE_FILE) exec frontend npm test
 
 .PHONY: lint
 lint: ## Run linters
 	@echo "$(YELLOW)🔍 Running linters...$(NC)"
-	@docker-compose -f $(COMPOSE_FILE) exec backend black . --check
-	@docker-compose -f $(COMPOSE_FILE) exec backend flake8 .
-	@docker-compose -f $(COMPOSE_FILE) exec frontend npm run lint
+	@$(DOCKER_COMPOSE_CMD) -f $(COMPOSE_FILE) exec backend black . --check
+	@$(DOCKER_COMPOSE_CMD) -f $(COMPOSE_FILE) exec backend flake8 .
+	@$(DOCKER_COMPOSE_CMD) -f $(COMPOSE_FILE) exec frontend npm run lint
 
 .PHONY: format
 format: ## Format code
 	@echo "$(YELLOW)✨ Formatting code...$(NC)"
-	@docker-compose -f $(COMPOSE_FILE) exec backend black .
-	@docker-compose -f $(COMPOSE_FILE) exec frontend npm run format
+	@$(DOCKER_COMPOSE_CMD) -f $(COMPOSE_FILE) exec backend black .
+	@$(DOCKER_COMPOSE_CMD) -f $(COMPOSE_FILE) exec frontend npm run format
 
 ##@ Maintenance Commands
 
@@ -303,7 +313,7 @@ update: ## Update application
 update-prod: ## Update production application
 	@echo "$(YELLOW)📦 Updating production application...$(NC)"
 	@git pull origin main
-	@docker-compose -f $(PROD_COMPOSE_FILE) pull
+	@$(DOCKER_COMPOSE_CMD) -f $(PROD_COMPOSE_FILE) pull
 	@$(MAKE) build-prod
 	@$(MAKE) migrate-prod
 	@$(MAKE) restart-prod
@@ -312,9 +322,9 @@ update-prod: ## Update production application
 .PHONY: clean
 clean: ## Clean up Docker resources
 	@echo "$(YELLOW)🧹 Cleaning up Docker resources...$(NC)"
-	@docker-compose -f $(COMPOSE_FILE) down -v --remove-orphans
-	@docker-compose -f $(PROD_COMPOSE_FILE) down -v --remove-orphans 2>/dev/null || true
-	@docker system prune -f
+	@$(DOCKER_COMPOSE_CMD) -f $(COMPOSE_FILE) down -v --remove-orphans
+	@$(DOCKER_COMPOSE_CMD) -f $(PROD_COMPOSE_FILE) down -v --remove-orphans 2>/dev/null || true
+	@$(DOCKER_CMD) system prune -f
 	@echo "$(GREEN)✅ Cleanup completed$(NC)"
 
 .PHONY: reset
@@ -340,7 +350,7 @@ generate-secrets: ## Generate secure secrets for .env file
 .PHONY: check-security
 check-security: ## Run security checks
 	@echo "$(YELLOW)🔍 Running security checks...$(NC)"
-	@docker run --rm -v $(PWD):/app securecodewarrior/docker-security-checker /app 2>/dev/null || echo "Security scanner not available"
+	@$(DOCKER_CMD) run --rm -v $(PWD):/app securecodewarrior/docker-security-checker /app 2>/dev/null || echo "Security scanner not available"
 	@echo "$(GREEN)✅ Security checks completed$(NC)"
 
 ##@ Information Commands
