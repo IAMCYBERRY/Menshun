@@ -1,0 +1,275 @@
+# Azure Container Apps Deployment Configuration
+apiVersion: apps/v1
+kind: ConfigMap
+metadata:
+  name: menshun-deployment-config
+data:
+  # Azure Container Apps bicep template
+  main.bicep: |
+    @description('Location for all resources')
+    param location string = resourceGroup().location
+    
+    @description('Environment name')
+    param environmentName string = 'menshun-env'
+    
+    @description('Container Apps Environment name')
+    param containerAppsEnvironmentName string = 'menshun-cae'
+    
+    @description('Azure AD Configuration')
+    param azureClientId string
+    param azureTenantId string
+    
+    @secure()
+    param azureClientSecret string
+    
+    @secure()
+    param databasePassword string
+    
+    // Container Apps Environment
+    resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2023-05-01' = {
+      name: containerAppsEnvironmentName
+      location: location
+      properties: {
+        appLogsConfiguration: {
+          destination: 'log-analytics'
+          logAnalyticsConfiguration: {
+            customerId: logAnalytics.properties.customerId
+            sharedKey: logAnalytics.listKeys().primarySharedKey
+          }
+        }
+      }
+    }
+    
+    // Log Analytics Workspace
+    resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2022-10-01' = {
+      name: '${environmentName}-logs'
+      location: location
+      properties: {
+        sku: {
+          name: 'PerGB2018'
+        }
+        retentionInDays: 30
+      }
+    }
+    
+    // PostgreSQL Flexible Server
+    resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2022-12-01' = {
+      name: '${environmentName}-postgres'
+      location: location
+      sku: {
+        name: 'Standard_B1ms'
+        tier: 'Burstable'
+      }
+      properties: {
+        version: '15'
+        administratorLogin: 'pamadmin'
+        administratorLoginPassword: databasePassword
+        storage: {
+          storageSizeGB: 32
+        }
+        backup: {
+          backupRetentionDays: 7
+          geoRedundantBackup: 'Disabled'
+        }
+        highAvailability: {
+          mode: 'Disabled'
+        }
+      }
+    }
+    
+    // Redis Cache
+    resource redisCache 'Microsoft.Cache/redis@2023-04-01' = {
+      name: '${environmentName}-redis'
+      location: location
+      properties: {
+        sku: {
+          name: 'Basic'
+          family: 'C'
+          capacity: 0
+        }
+        enableNonSslPort: false
+        minimumTlsVersion: '1.2'
+      }
+    }
+    
+    // Key Vault
+    resource keyVault 'Microsoft.KeyVault/vaults@2023-02-01' = {
+      name: '${environmentName}-kv'
+      location: location
+      properties: {
+        sku: {
+          family: 'A'
+          name: 'standard'
+        }
+        tenantId: subscription().tenantId
+        accessPolicies: []
+        enabledForDeployment: true
+        enabledForTemplateDeployment: true
+        enableSoftDelete: true
+        softDeleteRetentionInDays: 90
+      }
+    }
+    
+    // Backend Container App
+    resource backendApp 'Microsoft.App/containerApps@2023-05-01' = {
+      name: '${environmentName}-backend'
+      location: location
+      properties: {
+        managedEnvironmentId: containerAppsEnvironment.id
+        configuration: {
+          ingress: {
+            external: true
+            targetPort: 8000
+            allowInsecure: false
+          }
+          secrets: [
+            {
+              name: 'database-password'
+              value: databasePassword
+            }
+            {
+              name: 'azure-client-secret'
+              value: azureClientSecret
+            }
+          ]
+        }
+        template: {
+          containers: [
+            {
+              name: 'menshun-backend'
+              image: 'your-registry.azurecr.io/menshun-backend:latest'
+              env: [
+                {
+                  name: 'DATABASE_URL'
+                  value: 'postgresql://pamadmin:${databasePassword}@${postgresServer.properties.fullyQualifiedDomainName}:5432/pamdb'
+                }
+                {
+                  name: 'REDIS_URL'
+                  value: 'redis://:${redisCache.listKeys().primaryKey}@${redisCache.properties.hostName}:6380'
+                }
+                {
+                  name: 'AZURE_CLIENT_ID'
+                  value: azureClientId
+                }
+                {
+                  name: 'AZURE_TENANT_ID'
+                  value: azureTenantId
+                }
+                {
+                  name: 'AZURE_CLIENT_SECRET'
+                  secretRef: 'azure-client-secret'
+                }
+                {
+                  name: 'ENVIRONMENT'
+                  value: 'production'
+                }
+              ]
+              resources: {
+                cpu: json('0.5')
+                memory: '1Gi'
+              }
+            }
+          ]
+          scale: {
+            minReplicas: 1
+            maxReplicas: 10
+          }
+        }
+      }
+    }
+    
+    // Frontend Container App
+    resource frontendApp 'Microsoft.App/containerApps@2023-05-01' = {
+      name: '${environmentName}-frontend'
+      location: location
+      properties: {
+        managedEnvironmentId: containerAppsEnvironment.id
+        configuration: {
+          ingress: {
+            external: true
+            targetPort: 80
+            allowInsecure: false
+          }
+        }
+        template: {
+          containers: [
+            {
+              name: 'menshun-frontend'
+              image: 'your-registry.azurecr.io/menshun-frontend:latest'
+              env: [
+                {
+                  name: 'VITE_AZURE_CLIENT_ID'
+                  value: azureClientId
+                }
+                {
+                  name: 'VITE_AZURE_TENANT_ID'
+                  value: azureTenantId
+                }
+                {
+                  name: 'VITE_API_BASE_URL'
+                  value: 'https://${backendApp.properties.configuration.ingress.fqdn}/api/v1'
+                }
+              ]
+              resources: {
+                cpu: json('0.25')
+                memory: '0.5Gi'
+              }
+            }
+          ]
+          scale: {
+            minReplicas: 1
+            maxReplicas: 5
+          }
+        }
+      }
+    }
+    
+    output backendUrl string = 'https://${backendApp.properties.configuration.ingress.fqdn}'
+    output frontendUrl string = 'https://${frontendApp.properties.configuration.ingress.fqdn}'
+
+  # Deployment script
+  deploy.sh: |
+    #!/bin/bash
+    set -e
+    
+    # Variables
+    RESOURCE_GROUP="menshun-pam-rg"
+    LOCATION="eastus"
+    ENVIRONMENT_NAME="menshun-prod"
+    ACR_NAME="menshunacr"
+    
+    echo "🚀 Deploying Menshun PAM to Azure..."
+    
+    # Create resource group
+    az group create --name $RESOURCE_GROUP --location $LOCATION
+    
+    # Create Azure Container Registry
+    az acr create --resource-group $RESOURCE_GROUP --name $ACR_NAME --sku Basic --admin-enabled true
+    
+    # Build and push images
+    echo "📦 Building and pushing Docker images..."
+    
+    # Backend
+    docker build -t $ACR_NAME.azurecr.io/menshun-backend:latest -f backend/Dockerfile backend/
+    az acr login --name $ACR_NAME
+    docker push $ACR_NAME.azurecr.io/menshun-backend:latest
+    
+    # Frontend
+    docker build -t $ACR_NAME.azurecr.io/menshun-frontend:latest -f frontend/Dockerfile frontend/
+    docker push $ACR_NAME.azurecr.io/menshun-frontend:latest
+    
+    # Deploy infrastructure
+    echo "🏗️ Deploying infrastructure..."
+    az deployment group create \
+      --resource-group $RESOURCE_GROUP \
+      --template-file main.bicep \
+      --parameters \
+        environmentName=$ENVIRONMENT_NAME \
+        azureClientId=$AZURE_CLIENT_ID \
+        azureTenantId=$AZURE_TENANT_ID \
+        azureClientSecret=$AZURE_CLIENT_SECRET \
+        databasePassword=$DATABASE_PASSWORD
+    
+    echo "✅ Deployment complete!"
+    echo "Frontend URL: $(az deployment group show -g $RESOURCE_GROUP -n main --query properties.outputs.frontendUrl.value -o tsv)"
+    echo "Backend URL: $(az deployment group show -g $RESOURCE_GROUP -n main --query properties.outputs.backendUrl.value -o tsv)"

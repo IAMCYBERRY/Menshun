@@ -1,0 +1,627 @@
+# Menshun Enterprise PAM Tool - Production Docker Compose Configuration
+# This file defines the production deployment configuration with security hardening,
+# performance optimization, and monitoring capabilities
+
+version: '3.8'
+
+# Production volumes with specific drivers and options
+volumes:
+  postgres_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/menshun/data/postgres
+  redis_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/menshun/data/redis
+  vault_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/menshun/data/vault
+  nginx_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/menshun/logs/nginx
+  app_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/menshun/logs/app
+
+# Production networks with custom configuration
+networks:
+  menshun_frontend:
+    driver: bridge
+    name: menshun_frontend
+    ipam:
+      config:
+        - subnet: 172.20.1.0/24
+  menshun_backend:
+    driver: bridge
+    name: menshun_backend
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.20.2.0/24
+
+services:
+  # PostgreSQL Database - Production Configuration
+  postgres:
+    image: postgres:15-alpine
+    container_name: menshun_postgres_prod
+    restart: always
+    
+    environment:
+      POSTGRES_DB: pamdb
+      POSTGRES_USER: pamuser
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+      
+      # Production performance tuning
+      POSTGRES_SHARED_BUFFERS: 512MB
+      POSTGRES_EFFECTIVE_CACHE_SIZE: 2GB
+      POSTGRES_WORK_MEM: 8MB
+      POSTGRES_MAINTENANCE_WORK_MEM: 128MB
+      POSTGRES_CHECKPOINT_COMPLETION_TARGET: 0.9
+      POSTGRES_WAL_BUFFERS: 16MB
+      POSTGRES_DEFAULT_STATISTICS_TARGET: 100
+      POSTGRES_RANDOM_PAGE_COST: 1.1
+      
+      # Security and logging
+      POSTGRES_LOG_STATEMENT: 'mod'
+      POSTGRES_LOG_MIN_DURATION_STATEMENT: 500
+      POSTGRES_LOG_CONNECTIONS: 'on'
+      POSTGRES_LOG_DISCONNECTIONS: 'on'
+      POSTGRES_LOG_CHECKPOINTS: 'on'
+    
+    # No exposed ports in production - only internal access
+    expose:
+      - "5432"
+    
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/database/postgresql.prod.conf:/etc/postgresql/postgresql.conf:ro
+      - app_logs:/var/log/postgresql
+    
+    # Enhanced health check for production
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pamuser -d pamdb"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    
+    networks:
+      - menshun_backend
+    
+    # Production resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 3
+        window: 120s
+    
+    # Security: Run as non-root user
+    user: postgres
+    
+    # Use Docker secrets for sensitive data
+    secrets:
+      - db_password
+    
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+    
+    # Read-only root filesystem with writable data directories
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/run/postgresql
+
+  # Redis Cache - Production Configuration  
+  redis:
+    image: redis:7-alpine
+    container_name: menshun_redis_prod
+    restart: always
+    
+    # Production Redis configuration
+    command: >
+      redis-server
+      --appendonly yes
+      --appendfsync everysec
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --tcp-backlog 511
+      --timeout 300
+      --tcp-keepalive 300
+      --maxclients 10000
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+      --requirepass $(cat /run/secrets/redis_password)
+    
+    expose:
+      - "6379"
+    
+    volumes:
+      - redis_data:/data
+      - ./backend/redis/redis.prod.conf:/usr/local/etc/redis/redis.conf:ro
+    
+    healthcheck:
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "$(cat /run/secrets/redis_password)", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    
+    networks:
+      - menshun_backend
+    
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    
+    secrets:
+      - redis_password
+    
+    security_opt:
+      - no-new-privileges:true
+    
+    read_only: true
+    tmpfs:
+      - /tmp
+
+  # FastAPI Backend - Production Configuration
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production
+      args:
+        PYTHON_VERSION: 3.11
+        BUILD_DATE: ${BUILD_DATE}
+        VCS_REF: ${VCS_REF}
+    
+    container_name: menshun_backend_prod
+    restart: always
+    
+    environment:
+      # Production environment
+      ENVIRONMENT: production
+      DEBUG: "false"
+      LOG_LEVEL: INFO
+      
+      # Database connection with secret
+      DATABASE_URL: postgresql://pamuser:$(cat /run/secrets/db_password)@postgres:5432/pamdb
+      DB_ECHO: "false"
+      
+      # Redis connection with auth
+      REDIS_URL: redis://:$(cat /run/secrets/redis_password)@redis:6379/0
+      
+      # Azure AD configuration from secrets
+      AZURE_CLIENT_ID_FILE: /run/secrets/azure_client_id
+      AZURE_CLIENT_SECRET_FILE: /run/secrets/azure_client_secret
+      AZURE_TENANT_ID_FILE: /run/secrets/azure_tenant_id
+      
+      # Security configuration
+      SECRET_KEY_FILE: /run/secrets/secret_key
+      JWT_SECRET_KEY_FILE: /run/secrets/jwt_secret_key
+      JWT_ALGORITHM: HS256
+      JWT_EXPIRATION_HOURS: 8
+      
+      # Vault configuration
+      VAULT_TYPE: ${VAULT_TYPE:-azure_keyvault}
+      VAULT_ENCRYPTION_KEY_FILE: /run/secrets/vault_encryption_key
+      VAULT_PATH: /app/vault_data
+      
+      # Production API configuration
+      API_V1_PREFIX: /api/v1
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS}
+      
+      # Security settings
+      BCRYPT_ROUNDS: 14
+      SESSION_TIMEOUT_HOURS: 4
+      MAX_LOGIN_ATTEMPTS: 3
+      RATE_LIMIT_PER_MINUTE: 60
+      
+      # Feature flags
+      ENABLE_SWAGGER_UI: "false"
+      ENABLE_METRICS: "true"
+      ENABLE_AUDIT_LOGGING: "true"
+      
+      # Monitoring and observability
+      SENTRY_DSN_FILE: /run/secrets/sentry_dsn
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_ENDPOINT}
+      OTEL_SERVICE_NAME: menshun-backend
+      
+      # Email configuration
+      SMTP_HOST_FILE: /run/secrets/smtp_host
+      SMTP_PORT: 587
+      SMTP_USERNAME_FILE: /run/secrets/smtp_username
+      SMTP_PASSWORD_FILE: /run/secrets/smtp_password
+      SMTP_TLS: "true"
+    
+    expose:
+      - "8000"
+    
+    volumes:
+      - vault_data:/app/vault_data
+      - app_logs:/app/logs
+      - /etc/ssl/certs:/etc/ssl/certs:ro  # System CA certificates
+    
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 120s
+    
+    networks:
+      - menshun_backend
+      - menshun_frontend
+    
+    deploy:
+      replicas: 2  # Run multiple instances for high availability
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 3
+    
+    secrets:
+      - db_password
+      - redis_password
+      - azure_client_id
+      - azure_client_secret
+      - azure_tenant_id
+      - secret_key
+      - jwt_secret_key
+      - vault_encryption_key
+      - sentry_dsn
+      - smtp_host
+      - smtp_username
+      - smtp_password
+    
+    security_opt:
+      - no-new-privileges:true
+    
+    # Run as non-root user
+    user: "1000:1000"
+
+  # React Frontend - Production Build
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: production
+      args:
+        NODE_VERSION: 18
+        BUILD_DATE: ${BUILD_DATE}
+        VCS_REF: ${VCS_REF}
+        REACT_APP_VERSION: ${APP_VERSION}
+    
+    container_name: menshun_frontend_prod
+    restart: always
+    
+    # Frontend served by nginx, no direct exposure
+    networks:
+      - menshun_frontend
+    
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+    
+    security_opt:
+      - no-new-privileges:true
+
+  # Celery Worker - Production Configuration
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production
+    
+    restart: always
+    
+    command: >
+      celery -A app.celery worker
+      --loglevel=info
+      --concurrency=4
+      --prefetch-multiplier=1
+      --max-tasks-per-child=1000
+      --time-limit=600
+      --soft-time-limit=300
+    
+    environment:
+      DATABASE_URL: postgresql://pamuser:$(cat /run/secrets/db_password)@postgres:5432/pamdb
+      REDIS_URL: redis://:$(cat /run/secrets/redis_password)@redis:6379/0
+      SECRET_KEY_FILE: /run/secrets/secret_key
+      VAULT_ENCRYPTION_KEY_FILE: /run/secrets/vault_encryption_key
+      VAULT_PATH: /app/vault_data
+      
+      # Celery production configuration
+      CELERY_BROKER_URL: redis://:$(cat /run/secrets/redis_password)@redis:6379/0
+      CELERY_RESULT_BACKEND: redis://:$(cat /run/secrets/redis_password)@redis:6379/0
+      CELERY_TASK_SERIALIZER: json
+      CELERY_RESULT_SERIALIZER: json
+      CELERY_ACCEPT_CONTENT: ["json"]
+      CELERY_TIMEZONE: UTC
+      CELERY_ENABLE_UTC: "true"
+      CELERY_TASK_ACKS_LATE: "true"
+      CELERY_WORKER_DISABLE_RATE_LIMITS: "false"
+    
+    volumes:
+      - vault_data:/app/vault_data
+      - app_logs:/app/logs
+    
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    
+    healthcheck:
+      test: ["CMD", "celery", "-A", "app.celery", "inspect", "ping"]
+      interval: 60s
+      timeout: 30s
+      retries: 3
+      start_period: 60s
+    
+    networks:
+      - menshun_backend
+    
+    deploy:
+      replicas: 2  # Multiple workers for high availability
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+    
+    secrets:
+      - db_password
+      - redis_password
+      - secret_key
+      - vault_encryption_key
+    
+    security_opt:
+      - no-new-privileges:true
+    
+    user: "1000:1000"
+
+  # Celery Beat - Production Scheduler
+  celery_beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production
+    
+    container_name: menshun_celery_beat_prod
+    restart: always
+    
+    command: >
+      celery -A app.celery beat
+      --loglevel=info
+      --scheduler=django_celery_beat.schedulers:DatabaseScheduler
+      --pidfile=/tmp/celerybeat.pid
+    
+    environment:
+      DATABASE_URL: postgresql://pamuser:$(cat /run/secrets/db_password)@postgres:5432/pamdb
+      REDIS_URL: redis://:$(cat /run/secrets/redis_password)@redis:6379/0
+      CELERY_BROKER_URL: redis://:$(cat /run/secrets/redis_password)@redis:6379/0
+      CELERY_TIMEZONE: UTC
+      CELERY_ENABLE_UTC: "true"
+    
+    volumes:
+      - app_logs:/app/logs
+      - /tmp:/tmp  # For PID file
+    
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    
+    networks:
+      - menshun_backend
+    
+    deploy:
+      replicas: 1  # Only one beat scheduler needed
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+    
+    secrets:
+      - db_password
+      - redis_password
+    
+    security_opt:
+      - no-new-privileges:true
+    
+    user: "1000:1000"
+
+  # Nginx Reverse Proxy - Production Configuration
+  nginx:
+    image: nginx:alpine
+    container_name: menshun_nginx_prod
+    restart: always
+    
+    ports:
+      - "80:80"
+      - "443:443"
+    
+    volumes:
+      # Production nginx configuration
+      - ./nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      
+      # SSL certificates
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      
+      # Static files from frontend build
+      - frontend_static:/usr/share/nginx/html:ro
+      
+      # Nginx logs
+      - nginx_logs:/var/log/nginx
+      
+      # Security headers configuration
+      - ./nginx/security.conf:/etc/nginx/security.conf:ro
+    
+    depends_on:
+      - backend
+      - frontend
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    
+    networks:
+      - menshun_frontend
+    
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+    
+    security_opt:
+      - no-new-privileges:true
+
+  # Prometheus Monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: menshun_prometheus_prod
+    restart: always
+    
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+      - '--storage.tsdb.retention.time=30d'
+    
+    expose:
+      - "9090"
+    
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus_data:/prometheus
+    
+    networks:
+      - menshun_backend
+    
+    profiles:
+      - monitoring
+
+  # Grafana Dashboards
+  grafana:
+    image: grafana/grafana:latest
+    container_name: menshun_grafana_prod
+    restart: always
+    
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD_FILE: /run/secrets/grafana_admin_password
+      GF_SECURITY_SECRET_KEY_FILE: /run/secrets/grafana_secret_key
+      GF_INSTALL_PLUGINS: grafana-piechart-panel
+    
+    expose:
+      - "3000"
+    
+    volumes:
+      - ./monitoring/grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    
+    depends_on:
+      - prometheus
+    
+    networks:
+      - menshun_backend
+    
+    secrets:
+      - grafana_admin_password
+      - grafana_secret_key
+    
+    profiles:
+      - monitoring
+
+# Docker Secrets for Production
+secrets:
+  db_password:
+    file: ./secrets/db_password.txt
+  redis_password:
+    file: ./secrets/redis_password.txt
+  azure_client_id:
+    file: ./secrets/azure_client_id.txt
+  azure_client_secret:
+    file: ./secrets/azure_client_secret.txt
+  azure_tenant_id:
+    file: ./secrets/azure_tenant_id.txt
+  secret_key:
+    file: ./secrets/secret_key.txt
+  jwt_secret_key:
+    file: ./secrets/jwt_secret_key.txt
+  vault_encryption_key:
+    file: ./secrets/vault_encryption_key.txt
+  sentry_dsn:
+    file: ./secrets/sentry_dsn.txt
+  smtp_host:
+    file: ./secrets/smtp_host.txt
+  smtp_username:
+    file: ./secrets/smtp_username.txt
+  smtp_password:
+    file: ./secrets/smtp_password.txt
+  grafana_admin_password:
+    file: ./secrets/grafana_admin_password.txt
+  grafana_secret_key:
+    file: ./secrets/grafana_secret_key.txt
+
+# Production deployment profiles:
+#
+# Basic production:
+#   docker-compose -f docker-compose.prod.yml up -d
+#
+# With monitoring:
+#   docker-compose -f docker-compose.prod.yml --profile monitoring up -d

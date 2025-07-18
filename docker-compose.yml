@@ -1,0 +1,587 @@
+# Menshun Enterprise PAM Tool - Development Docker Compose Configuration
+# This file defines the complete development environment with all required services
+# For production deployment, use docker-compose.prod.yml
+
+version: '3.8'
+
+# Define named volumes for data persistence
+volumes:
+  postgres_data:
+    driver: local
+    name: menshun_postgres_data
+  redis_data:
+    driver: local  
+    name: menshun_redis_data
+  vault_data:
+    driver: local
+    name: menshun_vault_data
+
+# Define custom networks for service isolation
+networks:
+  menshun_network:
+    driver: bridge
+    name: menshun_network
+
+services:
+  # PostgreSQL Database Service
+  # Stores all application data including users, roles, credentials metadata
+  postgres:
+    image: postgres:15-alpine
+    container_name: menshun_postgres
+    restart: unless-stopped
+    
+    environment:
+      # Database configuration
+      POSTGRES_DB: pamdb
+      POSTGRES_USER: pamuser
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-dev_password_change_in_production}
+      
+      # Performance tuning
+      POSTGRES_SHARED_BUFFERS: 256MB
+      POSTGRES_EFFECTIVE_CACHE_SIZE: 1GB
+      POSTGRES_WORK_MEM: 4MB
+      POSTGRES_MAINTENANCE_WORK_MEM: 64MB
+      
+      # Logging configuration
+      POSTGRES_LOG_STATEMENT: 'mod'
+      POSTGRES_LOG_MIN_DURATION_STATEMENT: 1000
+    
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    
+    volumes:
+      # Persistent data storage
+      - postgres_data:/var/lib/postgresql/data
+      
+      # Custom initialization scripts
+      - ./backend/database/init.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
+      - ./backend/database/extensions.sql:/docker-entrypoint-initdb.d/02_extensions.sql:ro
+      
+      # Custom PostgreSQL configuration
+      - ./backend/database/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+    
+    # Health check to ensure database is ready before dependent services start
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pamuser -d pamdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    
+    networks:
+      - menshun_network
+    
+    # Security: Run as non-root user
+    user: postgres
+    
+    # Resource limits for development
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+
+  # Redis Cache and Session Store
+  # Handles caching, session storage, and Celery message brokering
+  redis:
+    image: redis:7-alpine
+    container_name: menshun_redis
+    restart: unless-stopped
+    
+    # Redis configuration via command line
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    
+    volumes:
+      # Persistent data storage for Redis
+      - redis_data:/data
+      
+      # Custom Redis configuration
+      - ./backend/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    
+    # Health check for Redis availability
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    
+    networks:
+      - menshun_network
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+
+  # FastAPI Backend Service
+  # Core API service handling authentication, user management, and business logic
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: development
+      args:
+        - PYTHON_VERSION=3.11
+        - BUILD_DATE=${BUILD_DATE:-$(date -u +'%Y-%m-%dT%H:%M:%SZ')}
+        - VCS_REF=${VCS_REF:-$(git rev-parse --short HEAD)}
+    
+    container_name: menshun_backend
+    restart: unless-stopped
+    
+    environment:
+      # Application configuration
+      ENVIRONMENT: development
+      DEBUG: "true"
+      LOG_LEVEL: INFO
+      
+      # Database connection
+      DATABASE_URL: postgresql://pamuser:${DB_PASSWORD:-dev_password_change_in_production}@postgres:5432/pamdb
+      DB_ECHO: "false"  # Set to true for SQL query logging
+      
+      # Redis connection
+      REDIS_URL: redis://redis:6379/0
+      
+      # Azure AD configuration
+      AZURE_CLIENT_ID: ${AZURE_CLIENT_ID}
+      AZURE_CLIENT_SECRET: ${AZURE_CLIENT_SECRET}
+      AZURE_TENANT_ID: ${AZURE_TENANT_ID}
+      AZURE_AUTHORITY: https://login.microsoftonline.com/${AZURE_TENANT_ID}
+      AZURE_SCOPE: https://graph.microsoft.com/.default
+      
+      # JWT and encryption
+      SECRET_KEY: ${SECRET_KEY:-dev_secret_key_change_in_production}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-dev_jwt_secret_change_in_production}
+      JWT_ALGORITHM: HS256
+      JWT_EXPIRATION_HOURS: 8
+      
+      # Vault configuration
+      VAULT_TYPE: ${VAULT_TYPE:-file_vault}
+      VAULT_ENCRYPTION_KEY: ${VAULT_ENCRYPTION_KEY:-dev_vault_key_change_in_production}
+      VAULT_PATH: /app/vault_data
+      
+      # API configuration
+      API_V1_PREFIX: /api/v1
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      
+      # Security settings
+      BCRYPT_ROUNDS: 12
+      SESSION_TIMEOUT_HOURS: 8
+      MAX_LOGIN_ATTEMPTS: 5
+      
+      # Feature flags
+      ENABLE_SWAGGER_UI: "true"
+      ENABLE_METRICS: "true"
+      ENABLE_AUDIT_LOGGING: "true"
+      
+      # External integrations
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+    
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    
+    volumes:
+      # Source code mounting for hot reload in development
+      - ./backend/app:/app/app:ro
+      
+      # Vault data persistence
+      - vault_data:/app/vault_data
+      
+      # Log file persistence
+      - ./logs:/app/logs
+      
+      # Temporary file storage
+      - ./temp:/app/temp
+    
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    
+    # Health check for backend API
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    
+    networks:
+      - menshun_network
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+
+  # React Frontend Service
+  # User interface for the PAM tool with modern React and TypeScript
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: development
+      args:
+        - NODE_VERSION=18
+        - BUILD_DATE=${BUILD_DATE:-$(date -u +'%Y-%m-%dT%H:%M:%SZ')}
+        - VCS_REF=${VCS_REF:-$(git rev-parse --short HEAD)}
+    
+    container_name: menshun_frontend
+    restart: unless-stopped
+    
+    environment:
+      # React environment variables
+      NODE_ENV: development
+      GENERATE_SOURCEMAP: "true"
+      
+      # API configuration
+      REACT_APP_API_URL: ${REACT_APP_API_URL:-http://localhost:8000}
+      REACT_APP_API_VERSION: v1
+      
+      # Azure AD configuration for frontend
+      REACT_APP_AZURE_CLIENT_ID: ${AZURE_CLIENT_ID}
+      REACT_APP_AZURE_TENANT_ID: ${AZURE_TENANT_ID}
+      REACT_APP_AZURE_AUTHORITY: https://login.microsoftonline.com/${AZURE_TENANT_ID}
+      REACT_APP_AZURE_REDIRECT_URI: ${REACT_APP_AZURE_REDIRECT_URI:-http://localhost:3000/auth/callback}
+      
+      # Application configuration
+      REACT_APP_NAME: Menshun
+      REACT_APP_VERSION: ${APP_VERSION:-1.0.0-dev}
+      REACT_APP_ENVIRONMENT: development
+      
+      # Feature flags
+      REACT_APP_ENABLE_DEVTOOLS: "true"
+      REACT_APP_ENABLE_ANALYTICS: "false"
+      REACT_APP_ENABLE_SENTRY: "false"
+      
+      # UI configuration
+      REACT_APP_THEME: solo-leveling-dark
+      REACT_APP_DEFAULT_LANGUAGE: en
+      
+      # Development configuration
+      FAST_REFRESH: "true"
+      WDS_SOCKET_HOST: localhost
+      WDS_SOCKET_PORT: 3000
+    
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    
+    volumes:
+      # Source code mounting for hot reload
+      - ./frontend/src:/app/src:ro
+      - ./frontend/public:/app/public:ro
+      - ./frontend/package.json:/app/package.json:ro
+      
+      # Node modules cache
+      - /app/node_modules
+    
+    depends_on:
+      - backend
+    
+    # Health check for frontend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    
+    networks:
+      - menshun_network
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+
+  # Celery Worker Service
+  # Background task processing for credential rotation, notifications, etc.
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: development
+    
+    container_name: menshun_celery_worker
+    restart: unless-stopped
+    
+    # Override the default command to run Celery worker
+    command: celery -A app.celery worker --loglevel=info --concurrency=2 --prefetch-multiplier=1
+    
+    environment:
+      # Inherit backend environment variables
+      DATABASE_URL: postgresql://pamuser:${DB_PASSWORD:-dev_password_change_in_production}@postgres:5432/pamdb
+      REDIS_URL: redis://redis:6379/0
+      AZURE_CLIENT_ID: ${AZURE_CLIENT_ID}
+      AZURE_CLIENT_SECRET: ${AZURE_CLIENT_SECRET}
+      AZURE_TENANT_ID: ${AZURE_TENANT_ID}
+      SECRET_KEY: ${SECRET_KEY:-dev_secret_key_change_in_production}
+      VAULT_TYPE: ${VAULT_TYPE:-file_vault}
+      VAULT_ENCRYPTION_KEY: ${VAULT_ENCRYPTION_KEY:-dev_vault_key_change_in_production}
+      VAULT_PATH: /app/vault_data
+      
+      # Celery specific configuration
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      CELERY_TASK_SERIALIZER: json
+      CELERY_RESULT_SERIALIZER: json
+      CELERY_ACCEPT_CONTENT: ["json"]
+      CELERY_TIMEZONE: UTC
+      CELERY_ENABLE_UTC: "true"
+      
+      # Worker configuration
+      CELERY_WORKER_CONCURRENCY: 2
+      CELERY_WORKER_PREFETCH_MULTIPLIER: 1
+      CELERY_TASK_SOFT_TIME_LIMIT: 300
+      CELERY_TASK_TIME_LIMIT: 600
+    
+    volumes:
+      # Share vault data with backend
+      - vault_data:/app/vault_data
+      
+      # Share logs
+      - ./logs:/app/logs
+      
+      # Source code for development
+      - ./backend/app:/app/app:ro
+    
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    
+    # Health check for Celery worker
+    healthcheck:
+      test: ["CMD", "celery", "-A", "app.celery", "inspect", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    
+    networks:
+      - menshun_network
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+
+  # Celery Beat Service
+  # Scheduler for periodic tasks like credential rotation
+  celery_beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: development
+    
+    container_name: menshun_celery_beat
+    restart: unless-stopped
+    
+    # Override command to run Celery beat scheduler
+    command: celery -A app.celery beat --loglevel=info --scheduler=django_celery_beat.schedulers:DatabaseScheduler
+    
+    environment:
+      # Database and Redis connections
+      DATABASE_URL: postgresql://pamuser:${DB_PASSWORD:-dev_password_change_in_production}@postgres:5432/pamdb
+      REDIS_URL: redis://redis:6379/0
+      
+      # Celery configuration
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      CELERY_TIMEZONE: UTC
+      CELERY_ENABLE_UTC: "true"
+      
+      # Beat scheduler configuration
+      CELERY_BEAT_SCHEDULE_FILENAME: /app/celerybeat-schedule
+      CELERY_BEAT_MAX_LOOP_INTERVAL: 300
+    
+    volumes:
+      # Persistent beat schedule
+      - ./celery:/app/celery
+      
+      # Logs
+      - ./logs:/app/logs
+      
+      # Source code for development
+      - ./backend/app:/app/app:ro
+    
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    
+    networks:
+      - menshun_network
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+
+  # Flower Service (Development Only)
+  # Celery monitoring and management interface
+  flower:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: development
+    
+    container_name: menshun_flower
+    restart: unless-stopped
+    
+    # Run Flower monitoring
+    command: celery -A app.celery flower --port=5555 --broker=redis://redis:6379/0
+    
+    environment:
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      FLOWER_BASIC_AUTH: ${FLOWER_USERNAME:-admin}:${FLOWER_PASSWORD:-flower_dev_password}
+    
+    ports:
+      - "${FLOWER_PORT:-5555}:5555"
+    
+    depends_on:
+      - redis
+      - celery_worker
+    
+    networks:
+      - menshun_network
+    
+    profiles:
+      - monitoring  # Only start with --profile monitoring
+
+  # Nginx Reverse Proxy (Development)
+  # Routes requests between frontend and backend, handles SSL termination
+  nginx:
+    image: nginx:alpine
+    container_name: menshun_nginx
+    restart: unless-stopped
+    
+    ports:
+      - "${NGINX_HTTP_PORT:-80}:80"
+      - "${NGINX_HTTPS_PORT:-443}:443"
+    
+    volumes:
+      # Nginx configuration
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      
+      # SSL certificates (if available)
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      
+      # Static files
+      - ./frontend/build:/usr/share/nginx/html:ro
+    
+    depends_on:
+      - backend
+      - frontend
+    
+    networks:
+      - menshun_network
+    
+    profiles:
+      - reverse-proxy  # Only start with --profile reverse-proxy
+
+  # Development Tools and Utilities
+  
+  # Database Admin Interface (Development Only)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: menshun_pgadmin
+    restart: unless-stopped
+    
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@menshun.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-pgadmin_dev_password}
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
+    
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    
+    volumes:
+      # Persistent PgAdmin data
+      - ./pgadmin:/var/lib/pgadmin
+      
+      # Pre-configured servers
+      - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
+    
+    depends_on:
+      postgres:
+        condition: service_healthy
+    
+    networks:
+      - menshun_network
+    
+    profiles:
+      - admin-tools  # Only start with --profile admin-tools
+
+  # Redis Commander (Development Only)
+  redis_commander:
+    image: rediscommander/redis-commander:latest
+    container_name: menshun_redis_commander
+    restart: unless-stopped
+    
+    environment:
+      REDIS_HOSTS: local:redis:6379
+      HTTP_USER: ${REDIS_COMMANDER_USER:-admin}
+      HTTP_PASSWORD: ${REDIS_COMMANDER_PASSWORD:-redis_dev_password}
+    
+    ports:
+      - "${REDIS_COMMANDER_PORT:-8081}:8081"
+    
+    depends_on:
+      redis:
+        condition: service_healthy
+    
+    networks:
+      - menshun_network
+    
+    profiles:
+      - admin-tools  # Only start with --profile admin-tools
+
+# Development profiles for different scenarios:
+# 
+# Default (no profile):
+#   - postgres, redis, backend, frontend, celery_worker, celery_beat
+#
+# Full development with monitoring:
+#   docker-compose --profile monitoring up -d
+#   - Adds: flower
+#
+# With reverse proxy:
+#   docker-compose --profile reverse-proxy up -d  
+#   - Adds: nginx
+#
+# With admin tools:
+#   docker-compose --profile admin-tools up -d
+#   - Adds: pgadmin, redis_commander
+#
+# Full development environment:
+#   docker-compose --profile monitoring --profile reverse-proxy --profile admin-tools up -d

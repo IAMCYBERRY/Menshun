@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: menshun-pam
+  labels:
+    name: menshun-pam
+    app.kubernetes.io/name: menshun
+    app.kubernetes.io/component: namespace

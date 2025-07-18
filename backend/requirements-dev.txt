@@ -1,0 +1,209 @@
+# Menshun Backend - Development Dependencies
+# Additional packages for development, testing, and code quality
+
+# Include production dependencies
+-r requirements.txt
+
+# =============================================================================
+# Testing Framework and Tools
+# =============================================================================
+pytest==7.4.3                       # Testing framework
+pytest-asyncio==0.21.1              # Pytest plugin for asyncio
+pytest-cov==4.1.0                   # Coverage plugin for pytest
+pytest-mock==3.12.0                 # Thin wrapper around mock for easier use
+pytest-xdist==3.5.0                 # Pytest plugin for distributed testing
+pytest-benchmark==4.0.0             # Benchmark plugin for pytest
+pytest-timeout==2.2.0               # Timeout plugin for pytest
+pytest-sugar==0.9.7                 # Changes default look and feel of pytest
+pytest-clarity==1.0.1               # Better pytest output
+pytest-html==4.1.1                  # HTML reports for pytest
+pytest-json-report==1.5.0           # JSON reports for pytest
+
+# =============================================================================
+# HTTP Testing
+# =============================================================================
+httpx==0.25.2                       # Async HTTP client for testing APIs
+requests-mock==1.11.0               # Mock library for requests
+responses==0.24.1                   # Mock library for requests
+
+# =============================================================================
+# Database Testing
+# =============================================================================
+pytest-postgresql==5.0.0           # PostgreSQL fixtures for pytest
+faker==20.1.0                       # Fake data generation
+factory-boy==3.3.0                  # Test fixtures replacement
+
+# =============================================================================
+# Code Quality and Linting
+# =============================================================================
+black==23.11.0                      # Code formatter
+isort==5.12.0                       # Import sorter
+flake8==6.1.0                       # Linting tool
+flake8-docstrings==1.7.0            # Docstring conventions checker
+flake8-import-order==0.18.2         # Import order checker
+flake8-bugbear==23.11.28            # Additional checks for common bugs
+flake8-comprehensions==3.14.0       # Comprehension checks
+flake8-simplify==0.21.0             # Code simplification suggestions
+pep8-naming==0.13.3                 # PEP 8 naming conventions checker
+
+# =============================================================================
+# Type Checking
+# =============================================================================
+mypy==1.7.1                         # Static type checker
+types-requests==2.31.0.10           # Type stubs for requests
+types-redis==4.6.0.11               # Type stubs for redis
+types-python-dateutil==2.8.19.14    # Type stubs for python-dateutil
+types-pytz==2023.3.1.1              # Type stubs for pytz
+
+# =============================================================================
+# Security Scanning
+# =============================================================================
+bandit==1.7.5                       # Security linter
+safety==2.3.5                       # Security vulnerability scanner
+semgrep==1.48.0                     # Static analysis tool
+
+# =============================================================================
+# Documentation
+# =============================================================================
+sphinx==7.2.6                       # Documentation generator
+sphinx-rtd-theme==1.3.0             # ReadTheDocs theme for Sphinx
+sphinx-autodoc-typehints==1.25.2    # Type hints support for Sphinx
+mkdocs==1.5.3                       # Documentation site generator
+mkdocs-material==9.4.8              # Material theme for MkDocs
+mkdocstrings[python]==0.24.0        # Automatic documentation from sources
+
+# =============================================================================
+# Development Tools
+# =============================================================================
+ipython==8.17.2                     # Enhanced interactive Python shell
+ipdb==0.13.13                       # IPython-enabled debugger
+pdbpp==0.10.3                       # Enhanced Python debugger
+watchdog==3.0.0                     # File system events monitoring
+python-dotenv==1.0.0                # Environment variables from .env file
+
+# =============================================================================
+# Performance Profiling
+# =============================================================================
+line-profiler==4.1.1                # Line-by-line profiler
+memory-profiler==0.61.0             # Memory usage profiler
+py-spy==0.3.14                      # Sampling profiler
+scalene==1.5.26                     # High-performance CPU+GPU+memory profiler
+
+# =============================================================================
+# API Documentation and Testing
+# =============================================================================
+swagger-ui-bundle==0.1.2            # Swagger UI static files
+redoc==2.1.0                        # API documentation generator
+
+# =============================================================================
+# Development Database Tools
+# =============================================================================
+pgcli==4.0.1                        # PostgreSQL command line interface
+redis-cli==0.1.3                    # Redis command line interface
+
+# =============================================================================
+# Environment and Process Management
+# =============================================================================
+python-decouple==3.8                # Separation of settings from code
+environs==10.0.0                    # Environment variable parsing
+honcho==1.1.0                       # Process manager (Python clone of Foreman)
+
+# =============================================================================
+# Notebook and Data Analysis (for development/debugging)
+# =============================================================================
+jupyter==1.0.0                      # Jupyter notebook
+notebook==7.0.6                     # Jupyter notebook server
+pandas==2.1.3                       # Data analysis library
+matplotlib==3.8.2                   # Plotting library
+
+# =============================================================================
+# Code Coverage and Reporting
+# =============================================================================
+coverage[toml]==7.3.2               # Code coverage measurement
+codecov==2.1.13                     # Code coverage reporting
+
+# =============================================================================
+# Pre-commit Hooks
+# =============================================================================
+pre-commit==3.6.0                   # Git pre-commit hooks framework
+
+# =============================================================================
+# Load Testing
+# =============================================================================
+locust==2.17.0                      # Load testing tool
+httpx==0.25.2                       # HTTP client for load testing
+
+# =============================================================================
+# Development Utilities
+# =============================================================================
+click==8.1.7                        # Command line interface creation
+rich==13.7.0                        # Rich text and beautiful formatting
+typer==0.9.0                        # CLI library based on Python type hints
+python-json-logger==2.0.7           # JSON formatter for Python logging
+
+# =============================================================================
+# Mock and Stub Generation
+# =============================================================================
+responses==0.24.1                   # Mock HTTP requests
+freezegun==1.2.2                    # Mock datetime
+time-machine==2.13.0                # Mock time and datetime
+
+# =============================================================================
+# Development Server Tools
+# =============================================================================
+uvicorn[standard]==0.24.0           # ASGI server with hot reload
+gunicorn==21.2.0                    # WSGI server for production testing
+
+# =============================================================================
+# Graph and Visualization (for architecture documentation)
+# =============================================================================
+graphviz==0.20.1                    # Graph visualization
+pydot==1.4.2                        # Interface to Graphviz
+
+# =============================================================================
+# Configuration Management
+# =============================================================================
+dynaconf==3.2.4                     # Configuration management
+omegaconf==2.3.0                    # Hierarchical configuration
+
+# =============================================================================
+# Development Database Seeding
+# =============================================================================
+mimesis==11.1.0                     # Fake data generator (alternative to Faker)
+
+# =============================================================================
+# Code Complexity Analysis
+# =============================================================================
+radon==6.0.1                        # Code complexity analysis
+xenon==0.9.1                        # Code complexity monitoring
+
+# =============================================================================
+# Import Analysis
+# =============================================================================
+isort==5.12.0                       # Import statement sorter
+unused-import==0.1.0                # Find unused imports
+
+# =============================================================================
+# Development Debugging
+# =============================================================================
+icecream==2.1.3                     # Debugging print replacement
+devtools==0.12.2                    # Development utilities
+python-dotenv==1.0.0                # Load environment variables
+
+# =============================================================================
+# Task Automation
+# =============================================================================
+invoke==2.2.0                       # Task automation tool
+nox==2023.4.22                      # Test automation tool
+
+# =============================================================================
+# Version Management
+# =============================================================================
+bump2version==1.0.1                 # Version bumping tool
+setuptools-scm==8.0.4               # Version from SCM metadata
+
+# =============================================================================
+# Development Container Tools
+# =============================================================================
+docker==6.1.3                       # Docker SDK for Python
+docker-compose==1.29.2              # Docker Compose integration

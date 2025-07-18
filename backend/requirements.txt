@@ -1,0 +1,137 @@
+# Menshun Backend - Production Dependencies
+# Core framework and essential packages for the PAM system
+
+# =============================================================================
+# Web Framework and API
+# =============================================================================
+fastapi==0.104.1                    # Modern, fast web framework for building APIs
+uvicorn[standard]==0.24.0           # ASGI server implementation
+gunicorn==21.2.0                    # Python WSGI HTTP Server for UNIX
+starlette==0.27.0                   # Lightweight ASGI framework
+
+# =============================================================================
+# Database and ORM
+# =============================================================================
+sqlalchemy==2.0.23                  # SQL toolkit and Object-Relational Mapping
+alembic==1.12.1                     # Database migration tool for SQLAlchemy
+psycopg2-binary==2.9.9              # PostgreSQL adapter for Python
+asyncpg==0.29.0                     # Async PostgreSQL driver
+
+# =============================================================================
+# Caching and Message Broker
+# =============================================================================
+redis==5.0.1                        # Redis client for caching and sessions
+celery[redis]==5.3.4                # Distributed task queue
+kombu==5.3.4                        # Messaging library for Python
+
+# =============================================================================
+# Authentication and Security
+# =============================================================================
+msal==1.25.0                        # Microsoft Authentication Library
+cryptography==41.0.7                # Cryptographic recipes and primitives
+passlib[bcrypt]==1.7.4              # Password hashing library
+python-jose[cryptography]==3.3.0    # JavaScript Object Signing and Encryption
+python-multipart==0.0.6             # Multipart form data parser
+
+# =============================================================================
+# Microsoft Graph Integration
+# =============================================================================
+microsoft-graph==1.3.0              # Microsoft Graph SDK
+msgraph-core==0.2.2                 # Microsoft Graph core library
+azure-identity==1.15.0              # Azure identity authentication
+azure-keyvault-secrets==4.7.0       # Azure Key Vault client library
+
+# =============================================================================
+# Data Validation and Serialization
+# =============================================================================
+pydantic[email]==2.5.0              # Data validation using Python type hints
+pydantic-settings==2.1.0            # Settings management using Pydantic
+
+# =============================================================================
+# HTTP Client and Utilities
+# =============================================================================
+httpx==0.25.2                       # Async HTTP client
+requests==2.31.0                    # HTTP library for Python
+aiofiles==23.2.1                    # File operations for asyncio
+
+# =============================================================================
+# Environment and Configuration
+# =============================================================================
+python-dotenv==1.0.0                # Load environment variables from .env file
+click==8.1.7                        # Command line interface creation toolkit
+
+# =============================================================================
+# Logging and Monitoring
+# =============================================================================
+structlog==23.2.0                   # Structured logging for Python
+sentry-sdk[fastapi]==1.38.0         # Error tracking and performance monitoring
+opentelemetry-api==1.21.0           # OpenTelemetry API
+opentelemetry-sdk==1.21.0           # OpenTelemetry SDK
+opentelemetry-instrumentation-fastapi==0.42b0  # FastAPI instrumentation
+prometheus-client==0.19.0           # Prometheus metrics client
+
+# =============================================================================
+# Date and Time Handling
+# =============================================================================
+python-dateutil==2.8.2              # Extensions to the standard datetime module
+pytz==2023.3.post1                  # World timezone definitions
+
+# =============================================================================
+# Data Processing and Utilities
+# =============================================================================
+email-validator==2.1.0              # Email validation
+phonenumbers==8.13.26               # Phone number parsing and validation
+pillow==10.1.0                      # Python Imaging Library (PIL Fork)
+openpyxl==3.1.2                     # Excel file reading and writing
+
+# =============================================================================
+# Background Task Scheduling
+# =============================================================================
+celery-beat==2.5.0                  # Celery periodic task scheduler
+django-celery-beat==2.5.0           # Database-backed periodic tasks
+
+# =============================================================================
+# Security and Encryption
+# =============================================================================
+pyotp==2.9.0                        # One-time password library
+qrcode[pil]==7.4.2                  # QR code generation
+bcrypt==4.1.2                       # Modern password hashing
+
+# =============================================================================
+# JSON and Data Formats
+# =============================================================================
+orjson==3.9.10                      # Fast JSON library
+ujson==5.8.0                        # Ultra fast JSON encoder and decoder
+
+# =============================================================================
+# File and Archive Handling
+# =============================================================================
+python-magic==0.4.27                # File type identification
+zipfile38==0.0.3                    # Backport of zipfile from Python 3.8
+
+# =============================================================================
+# Networking and Protocols
+# =============================================================================
+dnspython==2.4.2                    # DNS toolkit for Python
+urllib3==2.1.0                      # HTTP library with thread-safe connection pooling
+
+# =============================================================================
+# Template Engine (for email templates)
+# =============================================================================
+jinja2==3.1.2                       # Template engine for Python
+
+# =============================================================================
+# Performance and Optimization
+# =============================================================================
+aiocache==0.12.2                    # Asyncio cache manager
+cachetools==5.3.2                   # Extensible memoizing collections and decorators
+
+# =============================================================================
+# Compliance and Audit
+# =============================================================================
+python-audit==0.1.0                 # Audit logging utilities
+
+# =============================================================================
+# Development and Debugging (minimal for production)
+# =============================================================================
+rich==13.7.0                        # Rich text and beautiful formatting
