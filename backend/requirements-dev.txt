@@ -92,14 +92,13 @@ scalene==1.5.26                     # High-performance CPU+GPU+memory profiler
 # =============================================================================
 # API Documentation and Testing
 # =============================================================================
-swagger-ui-bundle==0.1.2            # Swagger UI static files
-redoc==2.1.0                        # API documentation generator
+# Note: FastAPI includes swagger-ui-bundle automatically
 
 # =============================================================================
 # Development Database Tools
 # =============================================================================
 pgcli==4.0.1                        # PostgreSQL command line interface
-redis-cli==0.1.3                    # Redis command line interface
+# Note: redis-cli is included with redis server installation
 
 # =============================================================================
 # Environment and Process Management
