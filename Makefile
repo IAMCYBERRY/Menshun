@@ -191,6 +191,8 @@ status: ## Show service status
 init-database: ## Initialize database (development)
 	@echo "$(YELLOW)🗄️  Initializing database...$(NC)"
 	@sleep 10  # Wait for database to be ready
+	@echo "$(YELLOW)🧹 Cleaning up any failed migrations...$(NC)"
+	@$(DOCKER_COMPOSE_CMD) -f $(COMPOSE_FILE) exec backend rm -f /app/alembic/versions/*.py 2>/dev/null || true
 	@echo "$(YELLOW)📝 Creating initial migration...$(NC)"
 	@$(DOCKER_COMPOSE_CMD) -f $(COMPOSE_FILE) exec backend alembic revision --autogenerate -m "Initial database schema"
 	@echo "$(YELLOW)⬆️  Running migrations...$(NC)"
