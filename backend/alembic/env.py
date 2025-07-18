@@ -147,9 +147,11 @@ async def run_async_migrations() -> None:
     This function handles async database connections and ensures
     proper cleanup and error handling.
     """
-    # Get database configuration
-    configuration = config.get_section(config.config_ini_section)
-    configuration["sqlalchemy.url"] = get_database_url()
+    # Create simple configuration
+    configuration = {
+        'sqlalchemy.url': get_database_url(),
+        'sqlalchemy.echo': 'false',
+    }
     
     # Create async engine
     connectable = AsyncEngine(
