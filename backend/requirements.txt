@@ -20,7 +20,7 @@ asyncpg==0.29.0                     # Async PostgreSQL driver
 # =============================================================================
 # Caching and Message Broker
 # =============================================================================
-redis==5.0.1                        # Redis client for caching and sessions
+redis==4.6.0                        # Redis client for caching and sessions
 celery[redis]==5.3.4                # Distributed task queue
 kombu==5.3.4                        # Messaging library for Python
 
