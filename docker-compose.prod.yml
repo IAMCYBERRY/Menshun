@@ -2,7 +2,6 @@
 # This file defines the production deployment configuration with security hardening,
 # performance optimization, and monitoring capabilities
 
-version: '3.8'
 
 # Production volumes with specific drivers and options
 volumes:

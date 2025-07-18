@@ -2,7 +2,6 @@
 # This file defines the complete development environment with all required services
 # For production deployment, use docker-compose.prod.yml
 
-version: '3.8'
 
 # Define named volumes for data persistence
 volumes:

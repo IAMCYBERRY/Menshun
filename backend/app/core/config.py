@@ -194,8 +194,10 @@ class Settings(BaseSettings):
     def parse_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:
         """Parse CORS origins from string or list."""
         if isinstance(v, str):
-            return [origin.strip() for origin in v.split(",")]
-        return v
+            if not v.strip():  # Handle empty string
+                return ["http://localhost:3000"]
+            return [origin.strip() for origin in v.split(",") if origin.strip()]
+        return v if v else ["http://localhost:3000"]
     
     @field_validator("ALLOWED_HOSTS", mode="before")
     @classmethod
