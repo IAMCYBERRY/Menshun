@@ -131,7 +131,7 @@ COPY --chown=menshun:menshun alembic/ ./alembic/
 
 # Copy configuration files
 COPY --chown=menshun:menshun scripts/ ./scripts/
-RUN chmod +x ./scripts/*.py ./scripts/*.sh
+RUN chmod +x ./scripts/*.py ./scripts/*.sh 2>/dev/null || true
 
 # Install the application
 RUN pip install --no-deps .
@@ -146,45 +146,8 @@ RUN apt-get update && apt-get remove -y gcc g++ \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-# Create startup script
-RUN echo '#!/bin/bash' > /app/start.sh && \
-    echo 'set -e' >> /app/start.sh && \
-    echo '' >> /app/start.sh && \
-    echo 'echo "Starting Menshun Backend..."' >> /app/start.sh && \
-    echo 'echo "Environment: $ENVIRONMENT"' >> /app/start.sh && \
-    echo 'echo "Build Date: $BUILD_DATE"' >> /app/start.sh && \
-    echo 'echo "VCS Ref: $VCS_REF"' >> /app/start.sh && \
-    echo '' >> /app/start.sh && \
-    echo '# Wait for database' >> /app/start.sh && \
-    echo 'echo "Waiting for database connection..."' >> /app/start.sh && \
-    echo 'python scripts/wait_for_db.py' >> /app/start.sh && \
-    echo '' >> /app/start.sh && \
-    echo '# Run database migrations' >> /app/start.sh && \
-    echo 'echo "Running database migrations..."' >> /app/start.sh && \
-    echo 'alembic upgrade head' >> /app/start.sh && \
-    echo '' >> /app/start.sh && \
-    echo '# Seed directory roles if needed' >> /app/start.sh && \
-    echo 'echo "Seeding directory roles..."' >> /app/start.sh && \
-    echo 'python -m app.scripts.seed_roles --if-empty' >> /app/start.sh && \
-    echo '' >> /app/start.sh && \
-    echo '# Start the application' >> /app/start.sh && \
-    echo 'echo "Starting FastAPI server..."' >> /app/start.sh && \
-    echo 'exec gunicorn app.main:app \' >> /app/start.sh && \
-    echo '    --bind 0.0.0.0:8000 \' >> /app/start.sh && \
-    echo '    --workers ${WORKERS:-4} \' >> /app/start.sh && \
-    echo '    --worker-class uvicorn.workers.UvicornWorker \' >> /app/start.sh && \
-    echo '    --worker-connections ${WORKER_CONNECTIONS:-1000} \' >> /app/start.sh && \
-    echo '    --max-requests ${MAX_REQUESTS:-1000} \' >> /app/start.sh && \
-    echo '    --max-requests-jitter ${MAX_REQUESTS_JITTER:-100} \' >> /app/start.sh && \
-    echo '    --timeout ${TIMEOUT:-30} \' >> /app/start.sh && \
-    echo '    --keep-alive ${KEEP_ALIVE:-5} \' >> /app/start.sh && \
-    echo '    --log-level ${LOG_LEVEL:-info} \' >> /app/start.sh && \
-    echo '    --access-logfile - \' >> /app/start.sh && \
-    echo '    --error-logfile - \' >> /app/start.sh && \
-    echo '    --capture-output \' >> /app/start.sh && \
-    echo '    --enable-stdio-inheritance' >> /app/start.sh
-
-RUN chmod +x /app/start.sh
+# Make scripts executable
+RUN chmod +x ./scripts/start.sh
 
 # Switch to non-root user
 USER menshun
@@ -225,5 +188,5 @@ ENV ENVIRONMENT=testing \
     DATABASE_URL=sqlite:///test.db \
     REDIS_URL=redis://redis:6379/1
 
-# Default command runs tests
-CMD ["pytest", "--cov=app", "--cov-report=xml", "--cov-report=html", "--cov-report=term-missing"]
+# Default command starts the application
+CMD ["./scripts/start.sh"]
