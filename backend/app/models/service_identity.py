@@ -418,7 +418,7 @@ class ServiceIdentity(FullBaseModel):
     # =============================================================================
     
     __table_args__ = (
-        # Composite indexes for common queries
+        # Basic composite indexes for common queries
         Index(
             "ix_service_identities_type_status",
             "identity_type",
@@ -436,33 +436,19 @@ class ServiceIdentity(FullBaseModel):
         ),
         Index(
             "ix_service_identities_rotation",
-            "next_rotation_date",
-            # postgresql_where="next_rotation_date IS NOT NULL AND is_active = true"  # Temporarily commented out for initial migration
+            "next_rotation_date"
         ),
         Index(
             "ix_service_identities_expiration",
-            "expires_at",
-            # postgresql_where="expires_at IS NOT NULL AND is_active = true"  # Temporarily commented out for initial migration
+            "expires_at"
         ),
-        
-        # Partial indexes for active identities
         Index(
             "ix_service_identities_active_name",
-            "name",
-            # postgresql_where="is_active = true AND is_deleted = false"  # Temporarily commented out for initial migration
+            "is_active",
+            "name"
         ),
-        
-        # Full-text search index
-        Index(
-            "ix_service_identities_search",
-            "name",
-            "description",
-            postgresql_using="gin",
-            postgresql_ops={
-                "name": "gin_trgm_ops",
-                "description": "gin_trgm_ops"
-            }
-        ),
+        # Note: Advanced indexes (GIN, partial indexes with WHERE clauses)
+        # will be added in separate migrations after basic table structure
     )
     
     # =============================================================================

@@ -337,7 +337,7 @@ class DirectoryRole(FullBaseModel):
             name="uq_directory_roles_template_id"
         ),
         
-        # Composite indexes for common queries
+        # Basic composite indexes for common queries
         Index(
             "ix_directory_roles_category_privileged",
             "category",
@@ -357,18 +357,8 @@ class DirectoryRole(FullBaseModel):
             "ix_directory_roles_assignment_count",
             "assignment_count"
         ),
-        
-        # Full-text search index for role names and descriptions
-        Index(
-            "ix_directory_roles_search",
-            "role_name",
-            "description",
-            postgresql_using="gin",
-            postgresql_ops={
-                "role_name": "gin_trgm_ops",
-                "description": "gin_trgm_ops"
-            }
-        ),
+        # Note: Advanced indexes (GIN, full-text search)
+        # will be added in separate migrations after basic table structure
     )
     
     # =============================================================================

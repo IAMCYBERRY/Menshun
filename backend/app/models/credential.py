@@ -323,7 +323,7 @@ class Credential(FullBaseModel):
     # =============================================================================
     
     __table_args__ = (
-        # Composite indexes for common queries
+        # Basic composite indexes for common queries
         Index(
             "ix_credentials_service_type",
             "service_identity_id",
@@ -337,27 +337,25 @@ class Credential(FullBaseModel):
         Index(
             "ix_credentials_rotation_schedule",
             "next_rotation_date",
-            "auto_rotation_enabled",
-            # postgresql_where="next_rotation_date IS NOT NULL AND auto_rotation_enabled = true"  # Temporarily commented out for initial migration
+            "auto_rotation_enabled"
         ),
         Index(
             "ix_credentials_expiry",
             "expires_at",
-            "status",
-            # postgresql_where="expires_at IS NOT NULL AND status = 'active'"  # Temporarily commented out for initial migration
+            "status"
         ),
         Index(
             "ix_credentials_usage",
             "last_used",
             "use_count"
         ),
-        
-        # Partial index for active credentials
         Index(
             "ix_credentials_active_name",
-            "name",
-            # postgresql_where="status = 'active' AND is_deleted = false"  # Temporarily commented out for initial migration
+            "status",
+            "name"
         ),
+        # Note: Partial indexes with WHERE clauses
+        # will be added in separate migrations after basic table structure
     )
     
     # =============================================================================
@@ -667,7 +665,7 @@ class CredentialRotation(FullBaseModel):
     # =============================================================================
     
     __table_args__ = (
-        # Composite indexes for queries
+        # Basic composite indexes for queries
         Index(
             "ix_credential_rotations_cred_status",
             "credential_id",
@@ -680,9 +678,10 @@ class CredentialRotation(FullBaseModel):
         ),
         Index(
             "ix_credential_rotations_retry",
-            "next_retry_at",
-            # postgresql_where="next_retry_at IS NOT NULL AND status = 'failed'"  # Temporarily commented out for initial migration
+            "next_retry_at"
         ),
+        # Note: Partial indexes with WHERE clauses
+        # will be added in separate migrations after basic table structure
     )
     
     # =============================================================================

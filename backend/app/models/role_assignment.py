@@ -306,11 +306,10 @@ class RoleAssignment(FullBaseModel):
             "directory_role_id",
             "user_id",
             "service_identity_id",
-            name="uq_role_assignments_unique_active",
-            # Note: This should include a condition for is_active = true
+            name="uq_role_assignments_unique_active"
         ),
         
-        # Composite indexes for common queries
+        # Basic composite indexes for common queries
         Index(
             "ix_role_assignments_user_active",
             "user_id",
@@ -330,25 +329,24 @@ class RoleAssignment(FullBaseModel):
         ),
         Index(
             "ix_role_assignments_expiry",
-            "expires_at",
-            # postgresql_where="expires_at IS NOT NULL AND is_active = true"  # Temporarily commented out for initial migration
+            "expires_at"
         ),
         Index(
             "ix_role_assignments_certification",
-            "next_certification_date",
-            # postgresql_where="requires_certification = true AND is_active = true"  # Temporarily commented out for initial migration
+            "next_certification_date"
         ),
         Index(
             "ix_role_assignments_emergency",
             "is_emergency",
-            "assigned_at",
-            # postgresql_where="is_emergency = true"  # Temporarily commented out for initial migration
+            "assigned_at"
         ),
         Index(
             "ix_role_assignments_sync_status",
             "sync_status",
             "last_sync_attempt"
         ),
+        # Note: Partial indexes with WHERE clauses
+        # will be added in separate migrations after basic table structure
     )
     
     # =============================================================================

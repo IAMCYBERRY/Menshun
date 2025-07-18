@@ -405,7 +405,7 @@ class AuditLog(BaseModel):
     # =============================================================================
     
     __table_args__ = (
-        # Indexes for common audit queries
+        # Basic indexes for common audit queries
         Index(
             "ix_audit_logs_timestamp_type",
             "timestamp",
@@ -434,31 +434,17 @@ class AuditLog(BaseModel):
             "timestamp"
         ),
         Index(
-            "ix_audit_logs_compliance",
-            "compliance_frameworks",
-            "retention_date",
-            postgresql_using="gin"
-        ),
-        Index(
             "ix_audit_logs_source_ip",
             "source_ip",
             "timestamp"
         ),
-        
-        # Full-text search index for descriptions and details
         Index(
-            "ix_audit_logs_search",
-            "description",
-            "details",
-            postgresql_using="gin",
-            postgresql_ops={
-                "description": "gin_trgm_ops",
-                "details": "gin_trgm_ops"
-            }
+            "ix_audit_logs_retention",
+            "retention_date"
         ),
-        
-        # Partition by timestamp for large datasets
-        # This would be implemented as table partitioning in PostgreSQL
+        # Note: Advanced indexes (GIN, full-text search, compliance)
+        # will be added in separate migrations after basic table structure
+        # and after required extensions are installed
     )
     
     # =============================================================================

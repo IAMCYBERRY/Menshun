@@ -323,7 +323,7 @@ class Session(FullBaseModel):
     # =============================================================================
     
     __table_args__ = (
-        # Composite indexes for common queries
+        # Basic composite indexes for common queries
         Index(
             "ix_sessions_user_active",
             "user_id",
@@ -349,21 +349,19 @@ class Session(FullBaseModel):
         Index(
             "ix_sessions_expiry_cleanup",
             "expires_at",
-            "is_active",
-            # postgresql_where="is_active = true"  # Temporarily commented out for initial migration
+            "is_active"
         ),
         Index(
             "ix_sessions_geographic",
             "country_code",
             "geographic_location"
         ),
-        
-        # Partial index for active sessions
         Index(
             "ix_sessions_active_activity",
-            "last_activity",
-            # postgresql_where="is_active = true"  # Temporarily commented out for initial migration
+            "last_activity"
         ),
+        # Note: Partial indexes with WHERE clauses
+        # will be added in separate migrations after basic table structure
     )
     
     # =============================================================================

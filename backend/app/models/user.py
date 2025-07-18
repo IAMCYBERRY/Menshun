@@ -338,7 +338,7 @@ class User(FullBaseModel):
             name="uq_privileged_users_source_user_id"
         ),
         
-        # Composite indexes for common queries
+        # Basic composite indexes for common queries
         Index(
             "ix_privileged_users_active_department",
             "is_active",
@@ -359,13 +359,13 @@ class User(FullBaseModel):
             "last_sign_in",
             "last_activity"
         ),
-        
-        # Partial index for active users only (performance optimization)
         Index(
             "ix_privileged_users_active_upn",
-            "upn",
-            # postgresql_where="is_active = true AND is_deleted = false"  # Temporarily commented out for initial migration
+            "is_active",
+            "upn"
         ),
+        # Note: Partial indexes with WHERE clauses
+        # will be added in separate migrations after basic table structure
     )
     
     # =============================================================================
