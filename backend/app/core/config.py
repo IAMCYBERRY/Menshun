@@ -41,9 +41,9 @@ class Settings(BaseSettings):
     # =============================================================================
     
     API_V1_PREFIX: str = Field(default="/api/v1", description="API v1 prefix")
-    CORS_ORIGINS: List[str] = Field(
-        default_factory=lambda: ["http://localhost:3000"],
-        description="CORS allowed origins"
+    CORS_ORIGINS: str = Field(
+        default="http://localhost:3000",
+        description="CORS allowed origins (comma-separated)"
     )
     ALLOWED_HOSTS: List[str] = Field(
         default_factory=lambda: ["localhost", "127.0.0.1"],
@@ -191,13 +191,18 @@ class Settings(BaseSettings):
     
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
-    def parse_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:
-        """Parse CORS origins from string or list."""
-        if isinstance(v, str):
-            if not v.strip():  # Handle empty string
-                return ["http://localhost:3000"]
-            return [origin.strip() for origin in v.split(",") if origin.strip()]
-        return v if v else ["http://localhost:3000"]
+    def parse_cors_origins(cls, v: str) -> str:
+        """Parse CORS origins from string."""
+        if not v or not v.strip():  # Handle empty string
+            return "http://localhost:3000"
+        return v.strip()
+    
+    @property
+    def cors_origins_list(self) -> List[str]:
+        """Get CORS origins as a list."""
+        if not self.CORS_ORIGINS or not self.CORS_ORIGINS.strip():
+            return ["http://localhost:3000"]
+        return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
     
     @field_validator("ALLOWED_HOSTS", mode="before")
     @classmethod
