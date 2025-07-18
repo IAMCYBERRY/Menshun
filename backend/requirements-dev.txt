@@ -7,7 +7,7 @@
 # =============================================================================
 # Testing Framework and Extensions
 # =============================================================================
-pytest==7.4.4                       # Testing framework
+pytest==7.4.3                       # Testing framework
 pytest-asyncio==0.21.1              # Async testing support
 pytest-cov==4.1.0                   # Coverage plugin for pytest
 pytest-mock==3.12.0                 # Mock fixtures for pytest
@@ -52,10 +52,10 @@ pep8-naming==0.13.3                 # PEP 8 naming conventions
 # =============================================================================
 # Type Checking
 # =============================================================================
-mypy==1.7.1                         # Static type checker
-types-requests==2.31.0.20           # Type stubs for requests
-types-redis==4.6.0.20               # Type stubs for redis
-types-python-dateutil==2.8.19.20    # Type stubs for dateutil
+mypy==1.8.0                         # Static type checker
+types-requests==2.32.0.20241016     # Type stubs for requests
+types-redis==4.6.0.20240425         # Type stubs for redis
+types-python-dateutil==2.8.19.20240311    # Type stubs for dateutil
 types-pytz==2023.3.1.1              # Type stubs for pytz
 
 # =============================================================================
